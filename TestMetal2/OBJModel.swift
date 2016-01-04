@@ -9,12 +9,6 @@
 import Foundation
 import simd
 
-struct Vertex {
-    let position : float4
-    let normal : float4
-//    let texCoords : float2
-}
-
 struct FaceVertex : Hashable, Equatable{
     let vi : UInt16
     let ti : UInt16
@@ -58,47 +52,48 @@ typealias IndexType = UInt16
 
 struct OBJGroup {
     let name : String
-    var vertices : [Vertex]?
-    var indicies : [IndexType]?
-    var vertexCount : size_t
-    var indexCount : size_t
+    var vertexData : NSData?
+    var indexData : NSData?
     
     init(name _name : String){
         name = _name
-        vertices = nil
-        indicies = nil
-        vertexCount = 0
-        indexCount = 0
     }
 }
 
 class OBJModel {
     var vertices = [float4]()
-    var normals = [float4]()
+    var normals = [float3]()
     var texCoords = [float2]()
     
     var groups = [OBJGroup]()
     var groupVertices = [Vertex]()
     var groupIndicies = [IndexType]()
     var vertexToGroupIndexMap = [FaceVertex : IndexType]()
-    
     var currentGroup : OBJGroup?
     
 
     
-    func parseModel(url : NSURL){
+    func parseModel(url : NSURL) -> Box?{
         var contents = ""
         do{
             contents = try String(contentsOfURL: url, encoding: NSASCIIStringEncoding)
         } catch{
             print("ERROR opening \(url)")
-            return
+            return nil
         }
         
         let scanner = NSScanner(string: contents)
         let skipSet = NSCharacterSet.whitespaceAndNewlineCharacterSet()
         let consumeSet = skipSet.invertedSet
         let newlineSet = NSCharacterSet.newlineCharacterSet()
+        
+        var min_x : Float  = 0.0
+        var min_y : Float  = 0.0
+        var min_z : Float  = 0.0
+        
+        var max_x : Float  = 0.0
+        var max_y : Float  = 0.0
+        var max_z : Float  = 0.0
         
         scanner.charactersToBeSkipped = skipSet
         
@@ -126,6 +121,14 @@ class OBJModel {
                 scanner.scanFloat(&y)
                 scanner.scanFloat(&z)
                 
+                min_x = min(min_x, x)
+                min_y = min(min_y, y)
+                min_z = min(min_z, z)
+                
+                max_x = max(max_x, x)
+                max_y = max(max_y, y)
+                max_z = max(max_z, z)
+                
                 let vertex = float4(x, y, z, 1)
                 vertices.append(vertex)
                 
@@ -146,7 +149,7 @@ class OBJModel {
                 scanner.scanFloat(&ny)
                 scanner.scanFloat(&nz)
                 
-                let normal = float4(nx, ny, nz, 0)
+                let normal = float3(nx, ny, nz)
                 normals.append(normal)
                 
             } else if token.isEqualToString("f") {
@@ -183,17 +186,25 @@ class OBJModel {
                 
                 addFaceWithFaceVertices(faceVertices)
                 
-            } else if token.isEqualToString("g") {
+            } else if token.isEqualToString("o") {
                 var groupName : NSString?
                 if scanner.scanUpToCharactersFromSet(newlineSet, intoString: &groupName) {
                     self.beginGroupWithName(groupName! as String)
                 }
             }
-            
         }
         
+        let origin = float3(min_x, min_y, min_z)
+        let width = max_x - min_x
+        let height = max_y - min_y
+        let depth = max_z - min_z
+        
+        
+        let hitbox = Box(origin: origin, width: width, height: height, depth: depth)
+        hitbox.printOut()
         self.endCurrentGroup()
         
+        return hitbox
     }
     
     
@@ -201,40 +212,30 @@ class OBJModel {
         self.endCurrentGroup()
         
         currentGroup = OBJGroup(name: name)
-        
-        
     }
     
     func endCurrentGroup(){
         if currentGroup != nil {
-            currentGroup!.vertexCount = groupVertices.count
-            if currentGroup!.vertexCount > 0 {
-                //WARNING: only copy address? and later removes all?
-                currentGroup!.vertices = groupVertices
-            }
             
-            currentGroup!.indexCount = groupIndicies.count
-            if currentGroup!.indexCount > 0 {
-                //WARNING: only copy address? and later removes all?
-                currentGroup!.indicies = groupIndicies
+            let vdata = NSMutableData()
+            for vert in groupVertices {
+                vdata.appendData(vert.toData())
             }
-            //WARNING: entry in array doesn't change in endCurrentGroup?
+            let iData = NSData(bytes: &groupIndicies, length: sizeof(IndexType) * groupIndicies.count)
+            currentGroup!.vertexData = vdata
+            currentGroup!.indexData = iData
             groups.append(currentGroup!)
-            print("End group \(groups.last?.name) \(groups.last?.indicies?.count)")
+            
             groupIndicies.removeAll()
             groupVertices.removeAll()
             vertexToGroupIndexMap.removeAll()
-            
-            
-            
-            print("End group \(groups.last?.name) \(groups.last?.indicies?.count)")
             
             currentGroup = nil
         }
     }
     
     func addFaceWithFaceVertices(faceVertices : [FaceVertex]) {
-        for var i = 0; i < faceVertices.count - 2; i++ {
+        for var i = 0; i < faceVertices.count - 2; ++i {
             self.addVertexToCurrentGroup(faceVertices[0])
             self.addVertexToCurrentGroup(faceVertices[i+1])
             self.addVertexToCurrentGroup(faceVertices[i+2])
@@ -242,14 +243,23 @@ class OBJModel {
     }
     
     func addVertexToCurrentGroup(fv : FaceVertex){
-        let UP = float4(0,1,0,0)
+        let UP = float3(0,1,0)
+        let ZERO2 = float2(0,0)
+        
         var groupIndex : UInt16 = 0
+        let INVALID_INDEX : UInt16 = 0xffff;
         
         let index = vertexToGroupIndexMap[fv]
         if index != nil {
             groupIndex = index!
         } else{
-            let vertex = Vertex(position: vertices[Int(fv.vi)], normal: fv.ni > 0 ? normals[Int(fv.ni)] : UP/*, texCoords: fv.ti > 0 ? texCoords[Int(fv.ti)] : float2(0,0)*/)
+    
+            var vertex = Vertex()
+            vertex.position = vertices[Int(fv.vi)]
+            vertex.normal   = fv.ni != INVALID_INDEX ? normals[Int(fv.ni)]   : UP
+            vertex.texCoords = fv.ti != INVALID_INDEX ? texCoords[Int(fv.ti)] : ZERO2
+    
+            
             groupVertices.append(vertex)
             groupIndex = UInt16(groupVertices.count - 1)
             vertexToGroupIndexMap[fv] = groupIndex

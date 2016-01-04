@@ -25,7 +25,7 @@ class MetalView : UIView {
     required init?(coder aDecoder: NSCoder) {
         super.init(coder: aDecoder)
         print("Init metal view")
-        metalLayer = self.layer as! CAMetalLayer
+        metalLayer = self.layer as? CAMetalLayer
         
     }
     

@@ -10,44 +10,17 @@ import Foundation
 import Metal
 import simd
 
-protocol ModelDelegate {
-    func wantsRenderer() -> Renderer
-}
 class Model{
     
-    var vertexBuffer : MTLBuffer?
-    var indexBuffer : MTLBuffer?
-    var uniformBuffer : MTLBuffer?
-    let objModel : OBJModel
-    var delegate : ModelDelegate?
-    
+    let model_key : String
     var transform : float4x4
     var position : float3 = float3(0,0,0)
-    var texture : MTLTexture?
+    var hitbox  : Box?
+    var uniformBuffer : MTLBuffer?
     
-    init(name : String, delegate del : ModelDelegate){
-        objModel = OBJModel()
-        delegate = del
-        transform = GameViewController.Identity()
-        loadModel(name)
-    }
-    
-    func loadModel(name : String){
-        let url = NSBundle.mainBundle().URLForResource(name, withExtension: "obj")
-        
-        if url == nil {
-            print("ERROR url with name \(name) couldn't be found. Aborting loadModel()")
-            return
-        }
-        
-        objModel.parseModel(url!)
-        
-        let group = objModel.groups[1]
-        
-        self.vertexBuffer = self.delegate!.wantsRenderer().newBufferWithBytes(group.vertices!, length: sizeof(Vertex) * group.vertexCount)
-        self.indexBuffer = self.delegate!.wantsRenderer().newBufferWithBytes(group.indicies!, length: sizeof(IndexType) * group.indexCount)
-        texture = self.delegate?.wantsRenderer().newTexture("spot_texture.png")
-        
+    init(name : String){
+        transform = Matrix.Identity()
+        model_key = name
     }
     
     func moveBy(offset : float3) {

@@ -1,3 +1,4 @@
+
 //
 //  Renderer.swift
 //  TestMetal2
@@ -38,6 +39,7 @@ class Renderer {
     var commandBuffer : MTLCommandBuffer?
     var drawable : CAMetalDrawable?
     var sampler : MTLSamplerState?
+    var depthTexture : MTLTexture?
     
     func initilize(){
         device = MTLCreateSystemDefaultDevice()
@@ -47,9 +49,12 @@ class Renderer {
         
         metalLayer?.device = device
         metalLayer?.pixelFormat = MTLPixelFormat.BGRA8Unorm
-        
+
         library = device?.newDefaultLibrary()
         pipelineIsDirty = true
+        
+        vertexFunctionName = "vertex_main"
+        fragmentFunctionName = "fragment_main"
         
         let samplerDescriptor = MTLSamplerDescriptor()
         samplerDescriptor.minFilter = MTLSamplerMinMagFilter.Nearest
@@ -60,26 +65,30 @@ class Renderer {
     
     func buildPipeline(){
         let vertexDescriptor = MTLVertexDescriptor()
+
         vertexDescriptor.attributes[0].format = MTLVertexFormat.Float4
         vertexDescriptor.attributes[0].bufferIndex = 0
-        vertexDescriptor.attributes[0].offset = 0
+        vertexDescriptor.attributes[0].offset = Vertex.offsetForPosition()
         
-        vertexDescriptor.attributes[1].format = MTLVertexFormat.Float4
+        vertexDescriptor.attributes[1].format = MTLVertexFormat.Float3
         vertexDescriptor.attributes[1].bufferIndex = 0
-        vertexDescriptor.attributes[1].offset = sizeof(float4) * 1
+        vertexDescriptor.attributes[1].offset = Vertex.offsetForNormal()
         
-//        vertexDescriptor.attributes[2].format = MTLVertexFormat.Float2;
-//        vertexDescriptor.attributes[2].bufferIndex = 0;
-//        vertexDescriptor.attributes[2].offset = sizeof(float4) * 2
+        vertexDescriptor.attributes[2].format = MTLVertexFormat.Float2;
+        vertexDescriptor.attributes[2].bufferIndex = 0;
+        vertexDescriptor.attributes[2].offset = Vertex.offsetForTexCoords()
         
         vertexDescriptor.layouts[0].stride = sizeof(Vertex)
         vertexDescriptor.layouts[0].stepFunction = MTLVertexStepFunction.PerVertex
         
         let pipelineDescriptor = MTLRenderPipelineDescriptor()
-        pipelineDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormat.BGRA8Unorm
         pipelineDescriptor.vertexFunction = self.library?.newFunctionWithName(self.vertexFunctionName)
         pipelineDescriptor.fragmentFunction = self.library?.newFunctionWithName(self.fragmentFunctionName)
         pipelineDescriptor.vertexDescriptor = vertexDescriptor
+        
+        pipelineDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormat.BGRA8Unorm
+        pipelineDescriptor.depthAttachmentPixelFormat = MTLPixelFormat.Depth32Float
+        
         
         let depthStencilDescriptor = MTLDepthStencilDescriptor()
         depthStencilDescriptor.depthCompareFunction = MTLCompareFunction.Less
@@ -116,8 +125,10 @@ class Renderer {
         let bytesPerPixel = 4
         let bytesPerRow = bytesPerPixel * width
         let bitsPerComponents = 8
-        //WARNING: options are not correct
-        let context = CGBitmapContextCreate(rawData, width, height, bitsPerComponents, bytesPerRow, colorspace, CGImageAlphaInfo.PremultipliedLast.rawValue)
+        var bitmapInfo = CGBitmapInfo.ByteOrder32Big.rawValue
+        bitmapInfo |= CGBitmapInfo(rawValue: CGImageAlphaInfo.PremultipliedLast.rawValue).rawValue
+
+        let context = CGBitmapContextCreate(rawData, width, height, bitsPerComponents, bytesPerRow, colorspace, bitmapInfo)
         
         CGContextTranslateCTM(context, 0, CGFloat(height))
         CGContextScaleCTM(context, 1, -1)
@@ -136,9 +147,18 @@ class Renderer {
     }
     
     
-    
+    func createDepthBuffer(){
+        let drawableSize = self.metalLayer?.drawableSize
+        let depthTexDesc =  MTLTextureDescriptor.texture2DDescriptorWithPixelFormat(MTLPixelFormat.Depth32Float, width: Int(drawableSize!.width), height: Int(drawableSize!.height), mipmapped: false)
+        
+        self.depthTexture = self.device?.newTextureWithDescriptor(depthTexDesc)
+    }
     
     func startFrame(){
+        if self.depthTexture == nil {
+            self.createDepthBuffer()
+        }
+        
         self.drawable = self.metalLayer?.nextDrawable()
         let frameBufferTexture = self.drawable?.texture
         
@@ -154,29 +174,39 @@ class Renderer {
         
         let renderPass = MTLRenderPassDescriptor()
         renderPass.colorAttachments[0].texture = frameBufferTexture
-        renderPass.colorAttachments[0].clearColor = MTLClearColorMake(0.9, 0.9, 0.9, 1)
-        renderPass.colorAttachments[0].storeAction = MTLStoreAction.Store
         renderPass.colorAttachments[0].loadAction = MTLLoadAction.Clear
+        renderPass.colorAttachments[0].storeAction = MTLStoreAction.Store
+        renderPass.colorAttachments[0].clearColor = MTLClearColorMake(0.9, 0.9, 0.9, 1)
+        
+        renderPass.depthAttachment.texture = self.depthTexture!
+        renderPass.depthAttachment.loadAction = MTLLoadAction.Clear;
+        renderPass.depthAttachment.storeAction = MTLStoreAction.Store;
+        renderPass.depthAttachment.clearDepth = 1;
         
         self.commandBuffer = self.commandQueue?.commandBuffer()
         self.commandEncoder = self.commandBuffer?.renderCommandEncoderWithDescriptor(renderPass)
         self.commandEncoder?.setRenderPipelineState(self.pipeline!)
         self.commandEncoder?.setDepthStencilState(self.depthStencilState)
-        self.commandEncoder?.setFrontFacingWinding(MTLWinding.Clockwise)
-        //WARNING, cull = none
-        self.commandEncoder?.setCullMode(MTLCullMode.None)
+        self.commandEncoder?.setFrontFacingWinding(MTLWinding.CounterClockwise)
+
+        self.commandEncoder?.setCullMode(MTLCullMode.Back)
     }
     
-    func drawTrianglesWithInterleavedBuffer(positionBuffer : MTLBuffer, indexBuffer : MTLBuffer, uniformBuffer : MTLBuffer, indexCount : size_t, texture : MTLTexture?){
+    func drawMesh(mesh : Mesh, uniformBuffer : MTLBuffer){
         
-        self.commandEncoder?.setVertexBuffer(positionBuffer, offset: 0, atIndex: 0)
+        self.commandEncoder?.setVertexBuffer(mesh.vertexBuffer!, offset: 0, atIndex: 0)
         self.commandEncoder?.setVertexBuffer(uniformBuffer, offset: 0, atIndex: 1)
         self.commandEncoder?.setFragmentBuffer(uniformBuffer, offset: 0, atIndex: 0)
 
-        self.commandEncoder?.setFragmentTexture(texture, atIndex: 0)
+        self.commandEncoder?.setFragmentTexture(mesh.texture, atIndex: 0)
         self.commandEncoder?.setFragmentSamplerState(self.sampler, atIndex: 0)
         
-        self.commandEncoder?.drawIndexedPrimitives(MTLPrimitiveType.Triangle, indexCount: indexCount, indexType: MTLIndexType.UInt16, indexBuffer: indexBuffer, indexBufferOffset: 0)
+        self.commandEncoder?.drawIndexedPrimitives(
+            MTLPrimitiveType.Triangle,
+            indexCount: Int(mesh.indexBuffer!.length / sizeof(UInt16)),
+            indexType: MTLIndexType.UInt16,
+            indexBuffer: mesh.indexBuffer!,
+            indexBufferOffset: 0)
     }
     
     func endFrame(){
@@ -189,7 +219,7 @@ class Renderer {
     }
     
     func newBufferWithBytes(bytes : UnsafePointer<Void>, length : Int)->MTLBuffer{
-        return self.device!.newBufferWithBytes(bytes, length: length, options: MTLResourceOptions.CPUCacheModeDefaultCache)
+        return self.device!.newBufferWithBytes(bytes, length: length, options: MTLResourceOptions.OptionCPUCacheModeDefault)
     }
 
 }

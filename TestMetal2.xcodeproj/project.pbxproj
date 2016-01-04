@@ -22,8 +22,14 @@
 		D1F412101C3A8B8700769E80 /* MetalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F4120F1C3A8B8700769E80 /* MetalView.swift */; };
 		D1F412121C3A8D9700769E80 /* Model.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F412111C3A8D9700769E80 /* Model.swift */; };
 		D1F412141C3A8F1D00769E80 /* plane.obj in Resources */ = {isa = PBXBuildFile; fileRef = D1F412131C3A8F1D00769E80 /* plane.obj */; };
-		D1F412161C3A99FB00769E80 /* spot_texture.png in Resources */ = {isa = PBXBuildFile; fileRef = D1F412151C3A99FB00769E80 /* spot_texture.png */; };
+		D1F412161C3A99FB00769E80 /* spot.png in Resources */ = {isa = PBXBuildFile; fileRef = D1F412151C3A99FB00769E80 /* spot.png */; };
 		D1F412181C3A9E1E00769E80 /* spot.obj in Resources */ = {isa = PBXBuildFile; fileRef = D1F412171C3A9E1E00769E80 /* spot.obj */; };
+		D1F4121F1C3ACB7100769E80 /* Stormtrooper.png in Resources */ = {isa = PBXBuildFile; fileRef = D1F4121D1C3ACB7100769E80 /* Stormtrooper.png */; };
+		D1F412201C3ACB7100769E80 /* Stormtrooper.obj in Resources */ = {isa = PBXBuildFile; fileRef = D1F4121E1C3ACB7100769E80 /* Stormtrooper.obj */; };
+		D1F412221C3ACCE600769E80 /* Camera.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F412211C3ACCE600769E80 /* Camera.swift */; };
+		D1F412251C3AE5D500769E80 /* Mesh.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F412241C3AE5D500769E80 /* Mesh.swift */; };
+		D1F412271C3AEDBE00769E80 /* Misc.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F412261C3AEDBE00769E80 /* Misc.swift */; };
+		D1F412291C3AEEA700769E80 /* Geometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F412281C3AEEA700769E80 /* Geometry.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -65,8 +71,14 @@
 		D1F4120F1C3A8B8700769E80 /* MetalView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MetalView.swift; sourceTree = "<group>"; };
 		D1F412111C3A8D9700769E80 /* Model.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Model.swift; sourceTree = "<group>"; };
 		D1F412131C3A8F1D00769E80 /* plane.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = plane.obj; sourceTree = "<group>"; };
-		D1F412151C3A99FB00769E80 /* spot_texture.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = spot_texture.png; sourceTree = "<group>"; };
+		D1F412151C3A99FB00769E80 /* spot.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = spot.png; sourceTree = "<group>"; };
 		D1F412171C3A9E1E00769E80 /* spot.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = spot.obj; sourceTree = "<group>"; };
+		D1F4121D1C3ACB7100769E80 /* Stormtrooper.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Stormtrooper.png; sourceTree = "<group>"; };
+		D1F4121E1C3ACB7100769E80 /* Stormtrooper.obj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = Stormtrooper.obj; sourceTree = "<group>"; };
+		D1F412211C3ACCE600769E80 /* Camera.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Camera.swift; sourceTree = "<group>"; };
+		D1F412241C3AE5D500769E80 /* Mesh.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Mesh.swift; sourceTree = "<group>"; };
+		D1F412261C3AEDBE00769E80 /* Misc.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Misc.swift; sourceTree = "<group>"; };
+		D1F412281C3AEEA700769E80 /* Geometry.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Geometry.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -119,20 +131,26 @@
 			children = (
 				D1F411D71C3A527D00769E80 /* AppDelegate.swift */,
 				D1F411D91C3A527D00769E80 /* GameViewController.swift */,
+				D1F412211C3ACCE600769E80 /* Camera.swift */,
 				D1F412111C3A8D9700769E80 /* Model.swift */,
+				D1F412241C3AE5D500769E80 /* Mesh.swift */,
 				D1F4120D1C3A743D00769E80 /* Renderer.swift */,
 				D1F412091C3A5C3700769E80 /* OBJModel.swift */,
+				D1F4120F1C3A8B8700769E80 /* MetalView.swift */,
+				D1F412281C3AEEA700769E80 /* Geometry.swift */,
+				D1F412261C3AEDBE00769E80 /* Misc.swift */,
 				D1F411DB1C3A527D00769E80 /* Shaders.metal */,
 				D1F411DD1C3A527D00769E80 /* Main.storyboard */,
-				D1F4120F1C3A8B8700769E80 /* MetalView.swift */,
 				D1F411E01C3A527D00769E80 /* Assets.xcassets */,
 				D1F411E21C3A527D00769E80 /* LaunchScreen.storyboard */,
+				D1F4121D1C3ACB7100769E80 /* Stormtrooper.png */,
+				D1F4121E1C3ACB7100769E80 /* Stormtrooper.obj */,
 				D1F411E51C3A527D00769E80 /* Info.plist */,
 				D1F412131C3A8F1D00769E80 /* plane.obj */,
 				D1F4120B1C3A721000769E80 /* teapot.obj */,
 				D1F412171C3A9E1E00769E80 /* spot.obj */,
 				D1F412071C3A579F00769E80 /* Ball.obj */,
-				D1F412151C3A99FB00769E80 /* spot_texture.png */,
+				D1F412151C3A99FB00769E80 /* spot.png */,
 			);
 			path = TestMetal2;
 			sourceTree = "<group>";
@@ -262,9 +280,11 @@
 				D1F411E41C3A527D00769E80 /* LaunchScreen.storyboard in Resources */,
 				D1F411E11C3A527D00769E80 /* Assets.xcassets in Resources */,
 				D1F412141C3A8F1D00769E80 /* plane.obj in Resources */,
-				D1F412161C3A99FB00769E80 /* spot_texture.png in Resources */,
+				D1F412161C3A99FB00769E80 /* spot.png in Resources */,
+				D1F4121F1C3ACB7100769E80 /* Stormtrooper.png in Resources */,
 				D1F411DF1C3A527D00769E80 /* Main.storyboard in Resources */,
 				D1F412081C3A579F00769E80 /* Ball.obj in Resources */,
+				D1F412201C3ACB7100769E80 /* Stormtrooper.obj in Resources */,
 				D1F4120C1C3A721000769E80 /* teapot.obj in Resources */,
 				D1F412181C3A9E1E00769E80 /* spot.obj in Resources */,
 			);
@@ -291,11 +311,15 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D1F412221C3ACCE600769E80 /* Camera.swift in Sources */,
 				D1F412121C3A8D9700769E80 /* Model.swift in Sources */,
 				D1F412101C3A8B8700769E80 /* MetalView.swift in Sources */,
+				D1F412291C3AEEA700769E80 /* Geometry.swift in Sources */,
+				D1F412271C3AEDBE00769E80 /* Misc.swift in Sources */,
 				D1F411DC1C3A527D00769E80 /* Shaders.metal in Sources */,
 				D1F4120A1C3A5C3700769E80 /* OBJModel.swift in Sources */,
 				D1F411DA1C3A527D00769E80 /* GameViewController.swift in Sources */,
+				D1F412251C3AE5D500769E80 /* Mesh.swift in Sources */,
 				D1F4120E1C3A743D00769E80 /* Renderer.swift in Sources */,
 				D1F411D81C3A527D00769E80 /* AppDelegate.swift in Sources */,
 			);
