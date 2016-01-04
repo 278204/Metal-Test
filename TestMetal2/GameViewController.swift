@@ -9,188 +9,185 @@
 import UIKit
 import Metal
 import MetalKit
+import simd
 
-let MaxBuffers = 3
-let ConstantBufferSize = 1024*1024
 
-let vertexData:[Float] =
-[
-    -1.0, -1.0, 0.0, 1.0,
-    -1.0,  1.0, 0.0, 1.0,
-    1.0, -1.0, 0.0, 1.0,
-    
-    1.0, -1.0, 0.0, 1.0,
-    -1.0,  1.0, 0.0, 1.0,
-    1.0,  1.0, 0.0, 1.0,
-    
-    -0.0, 0.25, 0.0, 1.0,
-    -0.25, -0.25, 0.0, 1.0,
-    0.25, -0.25, 0.0, 1.0
-]
+struct Uniforms
+{
+    let modelViewProjectionMatrix : float4x4
+    let modelViewMatrix : float4x4
+    let normalMatrix : float3x3
+};
 
-let vertexColorData:[Float] =
-[
-    0.0, 0.0, 1.0, 1.0,
-    0.0, 0.0, 1.0, 1.0,
-    0.0, 0.0, 1.0, 1.0,
+class GameViewController:UIViewController, ModelDelegate {
     
-    0.0, 0.0, 1.0, 1.0,
-    0.0, 0.0, 1.0, 1.0,
-    0.0, 0.0, 1.0, 1.0,
     
-    0.0, 0.0, 1.0, 1.0,
-    0.0, 1.0, 0.0, 1.0,
-    1.0, 0.0, 0.0, 1.0
-]
-
-class GameViewController:UIViewController, MTKViewDelegate {
+    var angularVelocity : CGPoint = CGPointZero
+    var angle : CGPoint = CGPointZero
     
-    var device: MTLDevice! = nil
+    var renderer : Renderer = Renderer()
+    var vertexBuffer : MTLBuffer?
+    var indexBuffer : MTLBuffer?
+    var uniformBuffer : MTLBuffer?
+    var displayLink : CADisplayLink?
     
-    var commandQueue: MTLCommandQueue! = nil
-    var pipelineState: MTLRenderPipelineState! = nil
-    var vertexBuffer: MTLBuffer! = nil
-    var vertexColorBuffer: MTLBuffer! = nil
+    var models = [Model]()
     
-    let inflightSemaphore = dispatch_semaphore_create(MaxBuffers)
-    var bufferIndex = 0
-    
-    // offsets used in animation
-    var xOffset:[Float] = [ -1.0, 1.0, -1.0 ]
-    var yOffset:[Float] = [ 1.0, 0.0, -1.0 ]
-    var xDelta:[Float] = [ 0.002, -0.001, 0.003 ]
-    var yDelta:[Float] = [ 0.001,  0.002, -0.001 ]
-    
+    var global_model : OBJModel? = nil
     override func viewDidLoad() {
         
         super.viewDidLoad()
+        renderer.metalLayer = self.view.layer as? CAMetalLayer
+        renderer.initilize()
+        renderer.vertexFunctionName = "vertex_main"
+        renderer.fragmentFunctionName = "fragment_main"
         
-        device = MTLCreateSystemDefaultDevice()
-        guard device != nil else { // Fallback to a blank UIView, an application could also fallback to OpenGL ES here.
-            print("Metal is not supported on this device")
-            self.view = UIView(frame: self.view.frame)
-            return
-        }
+        
+        
+        let panner = UIPanGestureRecognizer(target: self, action: Selector("panned:"))
+        self.view.addGestureRecognizer(panner)
+        
+        addModel("spot")
+        addModel("plane")
+    }
+    
+    func addModel(name : String){
+        let m = Model(name: name, delegate: self)
+        models.append(m)
+    }
+    
+    override func viewDidAppear(animated: Bool) {
+        self.displayLink = CADisplayLink(target: self, selector: "displayDidLinkFire:")
+        self.displayLink?.addToRunLoop(NSRunLoop.mainRunLoop(), forMode: NSRunLoopCommonModes)
+    }
+    
+    override func viewWillDisappear(animated: Bool) {
+        self.displayLink?.invalidate()
+        self.displayLink = nil
+    }
+    
+    func displayDidLinkFire(dLink : CADisplayLink){
+        self.redraw()
+    }
+    
+    func panned(panner : UIPanGestureRecognizer){
+        let velo = panner.velocityInView(self.view)
+        let translation = panner.translationInView(self.view)
+        self.angularVelocity = CGPoint(x: velo.x * 0.01, y: velo.y * 0.01)
+        models[0].moveBy(float3(Float(translation.x) * 0.01, Float(-translation.y) * 0.01, 0))
+        panner.setTranslation(CGPointZero, inView: self.view)
+    }
+    
 
-        // setup view properties
-        let view = self.view as! MTKView
-        view.device = device
-        view.delegate = self
+    func updateUniforms(modelMatrix : float4x4){
         
-        loadAssets()
+//        let X_AXIS = float3(1,0,0)
+//        let Y_AXIS = float3(0,1,0)
+        
+//        var modelMatrix = Identity()
+//        modelMatrix = Rotation(Y_AXIS, angle: Float(-self.angle.x)) * modelMatrix
+//        modelMatrix = Rotation(X_AXIS, angle: Float(-self.angle.y)) * modelMatrix
+        
+        
+        var viewMatrix = GameViewController.Identity()
+        viewMatrix[3].z = -2
+        
+        let near : Float = 1
+        let far : Float = 100
+        let aspect = Float(self.view.bounds.size.width / self.view.bounds.size.height)
+        let projectionMatrix = perspecitveProjection(aspect, fovy: DegToRad(75), near: near, far: far)
+
+        let modelView = viewMatrix * modelMatrix
+        let modelViewProj = projectionMatrix * modelView
+        var normalMatrix = float3x3()
+        normalMatrix[0] = modelView[0].xyz()
+        normalMatrix[1] = modelView[1].xyz()
+        normalMatrix[2] = modelView[2].xyz()
+        normalMatrix = normalMatrix.inverse.transpose
+        
+        var uniform = Uniforms(modelViewProjectionMatrix: modelViewProj, modelViewMatrix: modelView, normalMatrix: normalMatrix)
+        self.uniformBuffer = self.renderer.newBufferWithBytes(&uniform, length: sizeof(Uniforms))
     }
     
-    func loadAssets() {
+    func redraw(){
+        self.angle = CGPointMake(self.angle.x + self.angularVelocity.x * 0.1,
+            self.angle.y + self.angularVelocity.y * 0.1);
         
-        // load any resources required for rendering
-        let view = self.view as! MTKView
-        commandQueue = device.newCommandQueue()
-        commandQueue.label = "main command queue"
         
-        let defaultLibrary = device.newDefaultLibrary()!
-        let fragmentProgram = defaultLibrary.newFunctionWithName("passThroughFragment")!
-        let vertexProgram = defaultLibrary.newFunctionWithName("passThroughVertex")!
-        
-        let pipelineStateDescriptor = MTLRenderPipelineDescriptor()
-        pipelineStateDescriptor.vertexFunction = vertexProgram
-        pipelineStateDescriptor.fragmentFunction = fragmentProgram
-        pipelineStateDescriptor.colorAttachments[0].pixelFormat = view.colorPixelFormat
-        pipelineStateDescriptor.sampleCount = view.sampleCount
-        
-        do {
-            try pipelineState = device.newRenderPipelineStateWithDescriptor(pipelineStateDescriptor)
-        } catch let error {
-            print("Failed to create pipeline state, error \(error)")
+        self.renderer.startFrame()
+        for m in models {
+            self.updateUniforms(m.transform)
+            self.renderer.drawTrianglesWithInterleavedBuffer(m.vertexBuffer!, indexBuffer: m.indexBuffer!, uniformBuffer: self.uniformBuffer!, indexCount:m.indexBuffer!.length / sizeof(IndexType), texture: m.texture)
         }
         
-        // generate a large enough buffer to allow streaming vertices for 3 semaphore controlled frames
-        vertexBuffer = device.newBufferWithLength(ConstantBufferSize, options: [])
-        vertexBuffer.label = "vertices"
+        self.renderer.endFrame()
         
-        let vertexColorSize = vertexData.count * sizeofValue(vertexColorData[0])
-        vertexColorBuffer = device.newBufferWithBytes(vertexColorData, length: vertexColorSize, options: [])
-        vertexColorBuffer.label = "colors"
     }
     
-    func update() {
-        
-        // vData is pointer to the MTLBuffer's Float data contents
-        let pData = vertexBuffer.contents()
-        let vData = UnsafeMutablePointer<Float>(pData + 256*bufferIndex)
-        
-        // reset the vertices to default before adding animated offsets
-        vData.initializeFrom(vertexData)
-        
-        // Animate triangle offsets
-        let lastTriVertex = 24
-        let vertexSize = 4
-        for j in 0..<MaxBuffers {
-            // update the animation offsets
-            xOffset[j] += xDelta[j]
-            
-            if(xOffset[j] >= 1.0 || xOffset[j] <= -1.0) {
-                xDelta[j] = -xDelta[j]
-                xOffset[j] += xDelta[j]
-            }
-            
-            yOffset[j] += yDelta[j]
-            
-            if(yOffset[j] >= 1.0 || yOffset[j] <= -1.0) {
-                yDelta[j] = -yDelta[j]
-                yOffset[j] += yDelta[j]
-            }
-            
-            // Update last triangle position with updated animated offsets
-            let pos = lastTriVertex + j*vertexSize
-            vData[pos] = xOffset[j]
-            vData[pos+1] = yOffset[j]
-        }
+    class func Identity() -> float4x4 {
+        return float4x4(diagonal: float4(1,1,1,1))
     }
     
-    func drawInMTKView(view: MTKView) {
+    func perspecitveProjection(aspect : Float, fovy : Float, near : Float, far : Float) -> float4x4{
+        let yScale = 1 / tan(fovy * 0.5)
+        let xScale = yScale / aspect
+        let zRange = far - near
+        let zScale = -(far + near) / zRange
+        let wzScale = -2 * far * near / zRange
         
-        // use semaphore to encode 3 frames ahead
-        dispatch_semaphore_wait(inflightSemaphore, DISPATCH_TIME_FOREVER)
         
-        self.update()
+        var matrix = float4x4(diagonal: float4(xScale, yScale, zScale, 0))
+        matrix[3][2] = -1
+        matrix[2][3] = wzScale
+        return matrix
         
-        let commandBuffer = commandQueue.commandBuffer()
-        commandBuffer.label = "Frame command buffer"
-        
-        // use completion handler to signal the semaphore when this frame is completed allowing the encoding of the next frame to proceed
-        // use capture list to avoid any retain cycles if the command buffer gets retained anywhere besides this stack frame
-        commandBuffer.addCompletedHandler{ [weak self] commandBuffer in
-            if let strongSelf = self {
-                dispatch_semaphore_signal(strongSelf.inflightSemaphore)
-            }
-            return
-        }
-        
-        if let renderPassDescriptor = view.currentRenderPassDescriptor, currentDrawable = view.currentDrawable
-        {
-            let renderEncoder = commandBuffer.renderCommandEncoderWithDescriptor(renderPassDescriptor)
-            renderEncoder.label = "render encoder"
-            
-            renderEncoder.pushDebugGroup("draw morphing triangle")
-            renderEncoder.setRenderPipelineState(pipelineState)
-            renderEncoder.setVertexBuffer(vertexBuffer, offset: 256*bufferIndex, atIndex: 0)
-            renderEncoder.setVertexBuffer(vertexColorBuffer, offset:0 , atIndex: 1)
-            renderEncoder.drawPrimitives(.Triangle, vertexStart: 0, vertexCount: 9, instanceCount: 1)
-            
-            renderEncoder.popDebugGroup()
-            renderEncoder.endEncoding()
-                
-            commandBuffer.presentDrawable(currentDrawable)
-        }
-        
-        // bufferIndex matches the current semaphore controled frame index to ensure writing occurs at the correct region in the vertex buffer
-        bufferIndex = (bufferIndex + 1) % MaxBuffers
-        
-        commandBuffer.commit()
     }
     
+    func DegToRad(deg : Float) -> Float{
+        return deg * (Float(M_PI) / 180.0);
+    }
     
-    func mtkView(view: MTKView, drawableSizeWillChange size: CGSize) {
-        
+    func Rotation(axis : float3, angle : Float) ->float4x4 {
+        let c = cos(angle);
+        let s = sin(angle);
+
+        var X : float4 = float4()
+        X.x = axis.x * axis.x + (1 - axis.x * axis.x) * c;
+        X.y = axis.x * axis.y * (1 - c) - axis.z*s;
+        X.z = axis.x * axis.z * (1 - c) + axis.y * s;
+        X.w = 0.0;
+
+        var Y : float4 = float4()
+        Y.x = axis.x * axis.y * (1 - c) + axis.z * s;
+        Y.y = axis.y * axis.y + (1 - axis.y * axis.y) * c;
+        Y.z = axis.y * axis.z * (1 - c) - axis.x * s;
+        Y.w = 0.0;
+
+        var Z : float4 = float4()
+        Z.x = axis.x * axis.z * (1 - c) - axis.y * s;
+        Z.y = axis.y * axis.z * (1 - c) + axis.x * s;
+        Z.z = axis.z * axis.z + (1 - axis.z * axis.z) * c;
+        Z.w = 0.0;
+
+        var W : float4 = float4()
+        W.x = 0.0;
+        W.y = 0.0;
+        W.z = 0.0;
+        W.w = 1.0;
+
+        let mat = float4x4([X,Y,Z,W]);
+        return mat;
+    }
+    
+    func wantsRenderer() -> Renderer {
+        return self.renderer
+    }
+    
+}
+
+extension float4 {
+    func xyz()->float3 {
+        return float3(x, y, z)
     }
 }
+
