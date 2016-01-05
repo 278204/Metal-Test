@@ -28,6 +28,7 @@ class Math {
     }
 }
 
+
 extension float4 {
     func xyz()->float3 {
         return float3(x, y, z)

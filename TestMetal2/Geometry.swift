@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import UIKit
 import simd
 
 struct Box{
@@ -17,8 +18,11 @@ struct Box{
     
     func printOut(){
         print("Box:")
-        print("Origin: \(origin.x)x\(origin.y)x\(origin.z)")
-        print("Dimensions (WxHxD): \(width)x\(height)x\(depth)")
+        print("Origin: \(origin.x) x \(origin.y) x \(origin.z)")
+        print("Dimensions (WxHxD): \(width) x \(height) x \(depth)")
+    }
+    func rect() -> CGRect {
+        return CGRect(x: CGFloat(origin.x), y: CGFloat(origin.y), width: CGFloat(width), height: CGFloat(height))
     }
 }
 

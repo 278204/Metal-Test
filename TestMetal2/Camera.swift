@@ -45,6 +45,19 @@ class Camera {
         return uniform
     }
     
+    func moveZ(delta : Float){
+        moveOffset(float3(0,0,delta))
+    }
+    
+    func moveOffset(offset : float3){
+        var pos = position
+        pos.x += offset.x
+        pos.y += offset.y
+        pos.z += offset.z
+        position = pos
+    }
+    
+    
     private func perspecitveProjection(aspect : Float, fovy : Float, near : Float, far : Float) -> float4x4{
         let yScale : Float = 1 / tan(fovy * 0.5)
         let xScale : Float = yScale / aspect

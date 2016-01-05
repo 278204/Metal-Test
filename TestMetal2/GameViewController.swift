@@ -1,4 +1,4 @@
-//
+    //
 //  GameViewController.swift
 //  TestMetal2
 //
@@ -13,44 +13,44 @@ import simd
 
 class GameViewController:UIViewController{
     
-    var renderer    = Renderer()
     var models      = [Model]()
-    var meshes      = [String : Mesh]()
-    let camera      = Camera()
-    
+    let graphics    = Graphics()
     var lastScale   = Float(0.0)
     
     var displayLink : CADisplayLink?
+    let quadTree = QuadTree(level: 0, bounds: CGRect(x: -250, y: -250, width: 500, height: 500))
     
     override func viewDidLoad() {
         
         super.viewDidLoad()
-        renderer.metalLayer = self.view.layer as? CAMetalLayer
-        renderer.initilize()
-
-        camera.aspect = Float(self.view.frame.size.width / self.view.frame.size.height)
+        graphics.start((self.view.layer as? CAMetalLayer)!)
         let panner = UIPanGestureRecognizer(target: self, action: Selector("panned:"))
+        panner.minimumNumberOfTouches = 2
         self.view.addGestureRecognizer(panner)
         
         let pincher = UIPinchGestureRecognizer(target: self, action: Selector("pinched:"))
         self.view.addGestureRecognizer(pincher)
         
-        addModel("Stormtrooper")
+        
+        let presser = UILongPressGestureRecognizer(target: self, action: Selector("tapped:"))
+        presser.minimumPressDuration = 0.0
+        self.view.addGestureRecognizer(presser)
+
         addModel("spot")
+        
+        let floor = Model(name: "Floor")
+        floor.hitbox = Box(origin:float3(-100, -100, -1), width: 200, height:99, depth: 2)
+        floor.dynamic = false
+        models.append(floor)
+        
     }
     
     func addModel(name : String){
         
-        var mesh : Mesh? = meshes[name]
-        if mesh == nil {
-            print("Add new mesh for \(name)")
-            mesh = Mesh(name: name, renderer: self.renderer)
-            meshes[name] = mesh
-        }
-        
+        let mesh = graphics.addModel(name)
         let m = Model(name: name)
         models.append(m)
-        m.hitbox = mesh!.hitbox
+        m.hitbox = mesh.hitbox
         
         print("Added new model \(name), total nr models: \(models.count)")
     }
@@ -65,14 +65,25 @@ class GameViewController:UIViewController{
         self.displayLink = nil
     }
     
+    var lastTime : Double = 0
     func displayDidLinkFire(dLink : CADisplayLink){
-        self.redraw()
+        let currentTime = CACurrentMediaTime();
+        let delta = currentTime - lastTime
+        
+        if lastTime > 0 {
+            update(delta)
+        }
+        
+        lastTime = currentTime
+        
+        graphics.redraw(models)
     }
     
     func panned(panner : UIPanGestureRecognizer){
         let translation = panner.translationInView(self.view)
 
-        models[1].moveBy(float3(Float(translation.x) * 0.01, Float(-translation.y) * 0.01, 0))
+        graphics.camera.moveOffset(float3(Float(translation.x * 0.01), Float(-translation.y * 0.01), 0))
+        
         panner.setTranslation(CGPointZero, inView: self.view)
     }
     
@@ -82,38 +93,53 @@ class GameViewController:UIViewController{
             
         } else if pincher.state == .Changed {
             let delta = scale - lastScale
-            var pos = camera.position
-            pos.z += delta * 2
-            camera.position = pos
+            graphics.camera.moveZ(delta * 2)
         }
         
         lastScale = scale
     }
     
-
-    func updateUniforms(model : Model){
-
-        var uniform = camera.getUniform(model.transform)
-        if model.uniformBuffer == nil {
-            model.uniformBuffer = self.renderer.newBufferWithBytes(&uniform, length: sizeof(Uniforms))
-        } else{
-            memcpy(model.uniformBuffer!.contents(), &uniform, sizeof(Uniforms));
+    func tapped(tapper : UITapGestureRecognizer){
+        
+        switch tapper.state{
+        case .Began:
+            models[0].jumpStart()
+        case .Ended:
+            models[0].jumpEnd()
+        case .Cancelled:
+            models[0].jumpEnd()
+        default:
+            break
         }
-
+        
     }
     
-    func redraw(){
-        
-        self.renderer.startFrame()
-        
+    func update(dt : Double){
+        quadTree.clear()
         for m in models {
-            updateUniforms(m)
-            let mesh = meshes[m.model_key]!
-            self.renderer.drawMesh(mesh, uniformBuffer: m.uniformBuffer!)
+            
+             m.update(dt)
+            
+            let rect = m.next_rect
+            quadTree.insert((rect, m))
         }
         
-        self.renderer.endFrame()
+        for m in models where m.dynamic == true{
+            
+            let rect = m.next_rect
+            let l = quadTree.retrieveList(rect)
+            
+            for obj in l where (obj.model !== m) && (CGRectIntersectsRect(obj.rect, rect)){
+                m.handleIntersectWithRect(obj.rect)
+            }
+            
+            m.updateToNextRect()
+
+        }
     }
+    
+
+
 }
 
 

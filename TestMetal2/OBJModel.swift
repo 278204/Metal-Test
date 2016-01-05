@@ -199,9 +199,9 @@ class OBJModel {
         let height = max_y - min_y
         let depth = max_z - min_z
         
-        
         let hitbox = Box(origin: origin, width: width, height: height, depth: depth)
         hitbox.printOut()
+        
         self.endCurrentGroup()
         
         return hitbox
