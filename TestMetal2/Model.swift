@@ -22,7 +22,7 @@ class Model{
     var uniformBuffer : MTLBuffer?
     var velocity : float2 = float2(0,0)
     var dynamic = true
-    var onGround = false {didSet {}}
+    var onGround = false                    {didSet{    onGroundDidSet()}}
     var mass = 6.0
     
     init(name : String){
@@ -55,6 +55,22 @@ class Model{
         }
     }
     
+    
+    func rotateY(y_delta : Float){
+        
+        var rotate_mat = Matrix.Identity()
+        
+        let theta = Math.DegToRad(y_delta)
+        let cos_r = cos(theta)
+        let sin_r = sin(theta)
+        rotate_mat[0][0] = cos_r
+        rotate_mat[2][0] = -sin_r
+        rotate_mat[0][2] = sin_r
+        rotate_mat[2][2] = cos_r
+        
+        self.transform = rotate_mat * self.transform
+    }
+    
     func moveBy(offset : float3) {
         var pos = position
         pos.x += offset.x
@@ -82,10 +98,8 @@ class Model{
 //        print("New position: \(pos)")
     }
     
-    func landendOnGround(){
-        if onGround == true {
-            velocity.y = 0
-        }
+    func onGroundDidSet(){
+
     }
     
     func positionDidSet(){
@@ -109,8 +123,10 @@ class Model{
     }
     
     func handleIntersectWithRect(rect : CGRect){
-        let bottomPoint = CGPoint(x: next_rect.origin.x + next_rect.width/2, y: next_rect.origin.y)
+        
         onGround = false
+        
+        let bottomPoint = CGPoint(x: next_rect.origin.x + next_rect.width/2, y: next_rect.origin.y)
         
         if CGRectContainsPoint(rect, bottomPoint){
 

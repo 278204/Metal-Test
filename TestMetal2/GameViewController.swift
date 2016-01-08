@@ -21,22 +21,21 @@ class GameViewController:UIViewController{
     let quadTree = QuadTree(level: 0, bounds: CGRect(x: -250, y: -250, width: 500, height: 500))
     
     override func viewDidLoad() {
-        
+
         super.viewDidLoad()
         graphics.start((self.view.layer as? CAMetalLayer)!)
         let panner = UIPanGestureRecognizer(target: self, action: Selector("panned:"))
-        panner.minimumNumberOfTouches = 2
+        panner.minimumNumberOfTouches = 1
         self.view.addGestureRecognizer(panner)
         
         let pincher = UIPinchGestureRecognizer(target: self, action: Selector("pinched:"))
         self.view.addGestureRecognizer(pincher)
-        
-        
-        let presser = UILongPressGestureRecognizer(target: self, action: Selector("tapped:"))
-        presser.minimumPressDuration = 0.0
-        self.view.addGestureRecognizer(presser)
 
-        addModel("spot")
+//        let presser = UILongPressGestureRecognizer(target: self, action: Selector("tapped:"))
+//        presser.minimumPressDuration = 0.0
+//        self.view.addGestureRecognizer(presser)
+
+        addModel("pipe")
         
         let floor = Model(name: "Floor")
         floor.hitbox = Box(origin:float3(-100, -100, -1), width: 200, height:99, depth: 2)
@@ -49,8 +48,11 @@ class GameViewController:UIViewController{
         
         let mesh = graphics.addModel(name)
         let m = Model(name: name)
-        models.append(m)
+        
+//        m.dynamic = false
         m.hitbox = mesh.hitbox
+        m.transform = mesh.transform!
+        models.append(m)
         
         print("Added new model \(name), total nr models: \(models.count)")
     }
@@ -79,12 +81,19 @@ class GameViewController:UIViewController{
         graphics.redraw(models)
     }
     
+    var skeleton_ani = 1
     func panned(panner : UIPanGestureRecognizer){
         let translation = panner.translationInView(self.view)
 
-        graphics.camera.moveOffset(float3(Float(translation.x * 0.01), Float(-translation.y * 0.01), 0))
-        
+//        graphics.camera.moveOffset(float3(Float(translation.x * 0.01), Float(-translation.y * 0.01), 0))
+        models[0].rotateY(Float(translation.x * CGFloat(1)))
         panner.setTranslation(CGPointZero, inView: self.view)
+        
+        if panner.state == .Ended {
+            let mesh = graphics.meshes[models[0].model_key]
+            mesh?.skeleton.setAnimation(skeleton_ani++ % 2)
+        }
+        
     }
     
     func pinched(pincher : UIPinchGestureRecognizer){
@@ -93,7 +102,7 @@ class GameViewController:UIViewController{
             
         } else if pincher.state == .Changed {
             let delta = scale - lastScale
-            graphics.camera.moveZ(delta * 2)
+            graphics.camera.moveZ(delta * 10)
         }
         
         lastScale = scale

@@ -20,6 +20,25 @@ class Matrix{
     class func Identity() -> float4x4 {
         return float4x4(diagonal: float4(1,1,1,1))
     }
+    class func parseMatrix(input : String) -> float4x4{
+        let scanner = NSScanner(string: input)
+        scanner.charactersToBeSkipped = NSCharacterSet.whitespaceAndNewlineCharacterSet()
+        return Matrix.parseMatrix(scanner)
+    }
+    
+    class func parseMatrix(scanner : NSScanner) -> float4x4{
+        var matrix = float4x4()
+        
+        for i in 0..<4 {
+            for j in 0..<4 {
+                var x : Float = 0
+                scanner.scanFloat(&x)
+                matrix[j][i] = x
+            }
+        }
+        
+        return matrix
+    }
 }
 
 class Math {
@@ -28,7 +47,19 @@ class Math {
     }
 }
 
+func / (left : float3, right : Float) ->float3 {
+    var l = left
+    l.x = l.x/right
+    l.y = l.y/right
+    l.z = l.z/right
+    return l
+}
 
+extension float3{
+    func length() -> Float{
+        return sqrtf(x*x + y*y + z*z)
+    }
+}
 extension float4 {
     func xyz()->float3 {
         return float3(x, y, z)

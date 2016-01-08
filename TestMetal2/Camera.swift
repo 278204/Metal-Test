@@ -30,7 +30,7 @@ class Camera {
         let near : Float = 1
         let far : Float = 100
 
-        let projectionMatrix = perspecitveProjection(aspect, fovy: Math.DegToRad(45), near: near, far: far)
+        let projectionMatrix = perspecitveProjection(aspect, fovy: Math.DegToRad(95), near: near, far: far)
         
         let modelView = self.matrix * modelMatrix
         let modelViewProj = projectionMatrix * modelView

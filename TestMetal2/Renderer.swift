@@ -78,6 +78,22 @@ class Renderer {
         vertexDescriptor.attributes[2].bufferIndex = 0;
         vertexDescriptor.attributes[2].offset = Vertex.offsetForTexCoords()
         
+        vertexDescriptor.attributes[3].format = MTLVertexFormat.Short2
+        vertexDescriptor.attributes[3].bufferIndex = 0;
+        vertexDescriptor.attributes[3].offset = Vertex.offsetForBone1()
+        
+        vertexDescriptor.attributes[4].format = MTLVertexFormat.Short2
+        vertexDescriptor.attributes[4].bufferIndex = 0;
+        vertexDescriptor.attributes[4].offset = Vertex.offsetForBone2()
+        
+        vertexDescriptor.attributes[5].format = MTLVertexFormat.Float
+        vertexDescriptor.attributes[5].bufferIndex = 0;
+        vertexDescriptor.attributes[5].offset = Vertex.offsetForWeight1()
+        
+        vertexDescriptor.attributes[6].format = MTLVertexFormat.Float
+        vertexDescriptor.attributes[6].bufferIndex = 0;
+        vertexDescriptor.attributes[6].offset = Vertex.offsetForWeight2()
+        
         vertexDescriptor.layouts[0].stride = sizeof(Vertex)
         vertexDescriptor.layouts[0].stepFunction = MTLVertexStepFunction.PerVertex
         
@@ -196,8 +212,9 @@ class Renderer {
         
         self.commandEncoder?.setVertexBuffer(mesh.vertexBuffer!, offset: 0, atIndex: 0)
         self.commandEncoder?.setVertexBuffer(uniformBuffer, offset: 0, atIndex: 1)
+        self.commandEncoder?.setVertexBuffer(mesh.skeletonBuffer!, offset: 0, atIndex: 2)
+        
         self.commandEncoder?.setFragmentBuffer(uniformBuffer, offset: 0, atIndex: 0)
-
         self.commandEncoder?.setFragmentTexture(mesh.texture, atIndex: 0)
         self.commandEncoder?.setFragmentSamplerState(self.sampler, atIndex: 0)
         
@@ -220,6 +237,10 @@ class Renderer {
     
     func newBufferWithBytes(bytes : UnsafePointer<Void>, length : Int)->MTLBuffer{
         return self.device!.newBufferWithBytes(bytes, length: length, options: MTLResourceOptions.OptionCPUCacheModeDefault)
+    }
+    
+    func newbufferWithBytesNoCopy(bytes : UnsafeMutablePointer<Void>, length : Int) -> MTLBuffer{
+        return (self.device?.newBufferWithBytesNoCopy(bytes, length: length, options: MTLResourceOptions.StorageModeShared, deallocator: nil))!
     }
 
 }

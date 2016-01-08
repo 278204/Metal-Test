@@ -20,7 +20,7 @@ struct Light
 
 constant Light light = {
     .direction = { 0.13, 0.72, 0.68 },
-    .ambientColor = { 0.05, 0.05, 0.05 },
+    .ambientColor = { 0.5, 0.5, 0.5 },
     .diffuseColor = { 1, 1, 1 },
     .specularColor = { 0.2, 0.2, 0.2 }
 };
@@ -40,7 +40,13 @@ struct Vertex
     float4 position [[attribute(0)]];
     float3 normal [[attribute(1)]];
     float2 texCoords [[attribute(2)]];
+    char bone1 [[attribute(3)]];
+    char bone2 [[attribute(4)]];;
+    float weight1 [[attribute(5)]];
+    float weight2 [[attribute(6)]];
+    
 };
+
 
 struct ProjectedVertex
 {
@@ -51,12 +57,21 @@ struct ProjectedVertex
 };
 
 vertex ProjectedVertex vertex_main(Vertex vert [[stage_in]],
-                                   constant Uniforms &uniforms [[buffer(1)]])
+                                   constant Uniforms &uniforms [[buffer(1)]],
+                                   constant float4x4 *bones    [[buffer(2)]])
 {
     ProjectedVertex outVert;
-    outVert.position = uniforms.modelViewProjectionMatrix * vert.position;
-    outVert.eyePosition = -(uniforms.modelViewMatrix * vert.position).xyz;
-    outVert.normal = uniforms.normalMatrix * vert.normal;
+    float4 newpos = vert.position;
+    float4 newnormal = float4(vert.normal, 0.0);
+    
+    if(vert.bone1 >= 0){
+        newpos = (bones[vert.bone1] * vert.position) * vert.weight1;
+        newnormal = (bones[vert.bone1] * newnormal) * vert.weight1;
+    }
+    
+    outVert.position = uniforms.modelViewProjectionMatrix * newpos;//float4(newpos.xyz, 1.0);
+    outVert.eyePosition = -(uniforms.modelViewMatrix * newpos).xyz;
+    outVert.normal = uniforms.normalMatrix * newnormal.xyz;
     outVert.texCoords = vert.texCoords;
     return outVert;
 }
