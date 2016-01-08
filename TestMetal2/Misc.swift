@@ -41,6 +41,72 @@ class Matrix{
     }
 }
 
+class Quaternion {
+    typealias Quaternion = float4
+    
+    class func convertMatrix(mat : float4x4) -> Quaternion {
+        let qw = sqrt(1 + mat[0][0] + mat[1][1] + mat[2][2]) / 2
+        let qw4 = qw * 4
+        let qx = (mat[2][1] - mat[1][2])/qw4
+        let qy = (mat[0][2] - mat[2][0])/qw4
+        let qz = (mat[1][0] - mat[0][1])/qw4
+        
+        return Quaternion(qx, qy, qz, qw)
+    }
+    
+    class func convertToMatrix(q : Quaternion) -> float4x4{
+        var mat1 = float4x4()
+        mat1[0] = float4(q.w, -q.z, q.y, -q.x)
+        mat1[1] = float4(q.z, q.w, -q.x, -q.y)
+        mat1[2] = float4(-q.y, q.x, q.w, -q.z)
+        mat1[3] = float4(q.x, q.y, q.z, q.w)
+        
+        var mat2 = float4x4()
+        mat2[0] = float4(q.w, -q.z, q.y, q.x)
+        mat2[1] = float4(q.z, q.w, -q.x, q.y)
+        mat2[2] = float4(-q.y, q.x, q.w, q.z)
+        mat2[3] = float4(-q.x, -q.y, -q.z, q.w)
+        
+        return mat1 * mat2
+    }
+    
+    class func slerp(t : Float, q1 : Quaternion, var q2 : Quaternion) -> Quaternion{
+        var cos_theta_div2 = q1.w * q2.w + q1.x * q2.x + q1.y * q2.y + q1.z * q2.z
+
+        //WARNING, unneccessary?
+        if cos_theta_div2 < 0 {
+            q2.w = -q2.w; q2.x = -q2.x; q2.y = -q2.y; q2.z = q2.z;
+            cos_theta_div2 = -cos_theta_div2
+        }
+        
+        if cos_theta_div2 >= 1 {
+            return q1
+        }
+        
+        let theta_div2 = acos(cos_theta_div2)
+        let sin_theta_div2 = sqrt(1.0 - cos_theta_div2 * cos_theta_div2)
+        
+        if fabs(sin_theta_div2) < 0.001 {
+            let qm = Quaternion(q1.x * 0.5 + q2.x * 0.5,
+                q1.y * 0.5 + q2.y * 0.5,
+                q1.z * 0.5 + q2.z * 0.5,
+                q1.w * 0.5 + q2.w * 0.5)
+            return qm
+        }
+        
+        let ratio_a = sin((1 - t) * theta_div2) / sin_theta_div2
+        let ratio_b = sin(t * theta_div2) / sin_theta_div2
+        
+        let qm = Quaternion(q1.x * ratio_a + q2.x * ratio_b,
+            q1.y * ratio_a + q2.y * ratio_b,
+            q1.z * ratio_a + q2.z * ratio_b,
+            q1.w * ratio_a + q2.w * ratio_b)
+        
+        return qm
+    }
+}
+
+
 class Math {
     class func DegToRad(deg : Float) -> Float{
         return deg * (Float(M_PI) / 180.0);

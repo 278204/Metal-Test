@@ -18,10 +18,11 @@ class Mesh : SkeletonDelegate {
     var hitbox          : Box?
     var transform       : float4x4?
     var skeleton        : Skeleton
-    let renderer        : Renderer
-    init(name : String, renderer r : Renderer){
+    
+    
+    init(name : String, renderer : Renderer){
 
-        self.renderer = r
+
         let objModel = OBJModel()
         
         let dict = CPP_Wrapper().hello_cpp_wrapped(name) as! [String:AnyObject]
@@ -31,8 +32,9 @@ class Mesh : SkeletonDelegate {
         let ret = objModel.importStrings(a[0] as String, indices_and_normals_string: a[2] as String, normals_string: a[1] as String, transform: a[3] as String, tex_string: a[4] as String)
         skeleton = Skeleton()
         skeleton.delegate = self
-        skeleton.parseSkin(dict["skin"] as! [String : String], vertices: &objModel.groupVertices)
-        skeleton.parseSkeleton(dict["skeleton"] as! [[[String : String]]])
+
+        let i_b_p = skeleton.parseSkin(dict["skin"] as! [String : String], vertices: &objModel.groupVertices)
+        skeleton.parseSkeleton(dict["skeleton"] as! [[[String : String]]], inv_bind_matrices: i_b_p)
         skeleton.parseAnimations(dict["animations"] as! [[String : String]])
         
         objModel.endCurrentGroup()
@@ -56,10 +58,12 @@ class Mesh : SkeletonDelegate {
     
     func getSkeletonData() -> NSData{
         let skeleton_matrices = NSMutableData()
-        for s in skeleton.skeleton where s != nil{
+        for s in skeleton.joints where s != nil{
             var mat = s!.matrix
             skeleton_matrices.appendBytes(&mat, length: sizeof(float4x4))
         }
         return skeleton_matrices
     }
+    
+
 }

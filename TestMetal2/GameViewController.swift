@@ -93,7 +93,6 @@ class GameViewController:UIViewController{
             let mesh = graphics.meshes[models[0].model_key]
             mesh?.skeleton.setAnimation(skeleton_ani++ % 2)
         }
-        
     }
     
     func pinched(pincher : UIPinchGestureRecognizer){
@@ -143,7 +142,6 @@ class GameViewController:UIViewController{
             }
             
             m.updateToNextRect()
-
         }
     }
     

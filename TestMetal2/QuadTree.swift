@@ -24,7 +24,6 @@ class QuadTree{
         level = l
         bounds = b
         nodes = [QuadTree?](count: 4, repeatedValue: nil)
-        
     }
     
     func clear(){

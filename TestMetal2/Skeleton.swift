@@ -13,13 +13,16 @@ class Joint {
     let name : String
     var matrix : float4x4
     var transform : float4x4
+    var inv_bind_pose : float4x4
+    
     let parent : Joint?
     
-    init(name n : String, parent p : Joint?){
+    init(name n : String, parent p : Joint?, inverse_bind_pose inv_b_p : float4x4){
         name = n
         parent = p
         matrix = Matrix.Identity()
         transform = Matrix.Identity()
+        inv_bind_pose = inv_b_p
     }
     
     func isRoot() -> Bool{
@@ -52,12 +55,11 @@ protocol SkeletonDelegate {
     func skeletonDidChangeAnimation()
 }
 class Skeleton{
-    var skeleton_parts : [String]?
+    var skeleton_parts : [String : Int] = [String : Int]()
     var joints : [Joint?]
-    var inv_bind_matrices = [float4x4]()
-    var bind_shape : float4x4 = Matrix.Identity()
     var animations : [JointAnimation?]
     var delegate : SkeletonDelegate?
+    var root_joint : Joint?
     
     init () {
         animations = [JointAnimation?](count: 0, repeatedValue: nil)
@@ -65,7 +67,7 @@ class Skeleton{
     }
     
     
-    func parseSkin(skin : [String:String], inout vertices : [Vertex]){
+    func parseSkin(skin : [String:String], inout vertices : [Vertex]) -> [float4x4]{
         
         let name = skin["name"]!
         
@@ -80,8 +82,7 @@ class Skeleton{
         let inv_bind_count = Int(inv_bind_array[0])! / 16
         
         
-        bind_shape = Matrix.parseMatrix(bind_shape_string)
-        bind_shape.printOut()
+        let bind_shape = Matrix.parseMatrix(bind_shape_string)
         
         for i in 0..<vertices.count {
             vertices[i].position = bind_shape * vertices[i].position
@@ -90,6 +91,7 @@ class Skeleton{
         let skipSet = NSCharacterSet.whitespaceAndNewlineCharacterSet()
         var scanner = NSScanner(string: inv_bind_matrix_string)
         scanner.charactersToBeSkipped = skipSet
+        var inv_bind_matrices = [float4x4]()
         
         for _ in 0..<inv_bind_count {
             let matrix = Matrix.parseMatrix(scanner)
@@ -106,8 +108,11 @@ class Skeleton{
             weights.append(w)
         }
         
-        let joints = joints_string.componentsSeparatedByString(" ")
-        skeleton_parts = joints
+        let joint_names = joints_string.componentsSeparatedByString(" ")
+        for i in 0..<joint_names.count {
+            let name = joint_names[i]
+            skeleton_parts[name] = i
+        }
         
         let index_array = weight_indicies_string.componentsSeparatedByString("||")
         let index_count = Int(index_array[0])!
@@ -115,9 +120,6 @@ class Skeleton{
         let indicies = index_array[2].componentsSeparatedByString(" ")
         
         for i in 0..<index_count where Int(vcount_arr[i]) > 0 {
-            //            let vcount = Int(vcount_arr[i])!
-            
-            //            for v in 0..<vcount {
             //WARNING, more than one v vount, make explode
             let joint_i = Int(indicies[2*i])!
             let weigth_i = Int(indicies[2*i + 1])!
@@ -129,18 +131,15 @@ class Skeleton{
             vert.weight2 = weights[weigth_i]
             
             vertices[i] = vert
-            //            }
         }
-        
+        return inv_bind_matrices
         
     }
     
-    func parseSkeleton(structure : [[[String:String]]]){
-        guard skeleton_parts != nil else {
-            return
-        }
+    func parseSkeleton(structure : [[[String:String]]], inv_bind_matrices : [float4x4]){
+
         var parents = [String : Joint]()
-        joints = [Joint?](count: skeleton_parts!.count, repeatedValue: nil)
+        joints = [Joint?](count: skeleton_parts.values.count, repeatedValue: nil)
         var root : Joint?
         
         for a in structure {
@@ -151,18 +150,21 @@ class Skeleton{
                 let matrix = d["transform"]!
                 let parent = d["parent"]!
                 var joint : Joint?
+                let index = skeleton_parts[name]
+                
                 if parent.characters.count > 0 {
-                    joint = Joint(name: name, parent: parents[parent])
+                    joint = Joint(name: name, parent: parents[parent], inverse_bind_pose: inv_bind_matrices[index!])
                 } else{
-                    joint = Joint(name: name, parent: nil)
+                    joint = Joint(name: name, parent: nil, inverse_bind_pose: Matrix.Identity())
                 }
                 joint?.transform = Matrix.parseMatrix(matrix)
                 parents[name] = joint!
-                let index = skeleton_parts?.indexOf(name)
+                
                 if index != nil {
                     joints[index!] = joint!
                 } else if root == nil && parent.characters.count == 0{
                     root = joint!
+                    root_joint = joint!
                 } else{
                     print("ERROR, multiple roots?")
                 }
@@ -210,7 +212,7 @@ class Skeleton{
     
     func parseAnimations(animations_unparsed : [[String : String]]) {
         
-        animations = [JointAnimation?](count: skeleton_parts!.count, repeatedValue: nil)
+        animations = [JointAnimation?](count: joints.count, repeatedValue: nil)
 
         for ani in animations_unparsed {
             let joint_name = ani["joint"]!
@@ -241,14 +243,24 @@ class Skeleton{
             a.printOut()
             
             
-            let index = skeleton_parts?.indexOf(joint_name)
+            let index = skeleton_parts[joint_name]
             animations[index!] = a
             
         }
+    
         
-        animations[0]!.transforms[1] = animations[1]!.transforms[1] * animations[0]!.transforms[1]
-        animations[0]!.transforms[0] = animations[1]!.transforms[0] * animations[0]!.transforms[0]
-
+        updateTransformsToAbsolute(root_joint!, ani: &animations)
+    }
+    
+    func updateTransformsToAbsolute(parent : Joint, inout ani : [JointAnimation?]){
+        //OPTIMAZE?
+        for j in ani where joints[skeleton_parts[j!.joint_name]!]!.parent === parent{
+            
+            for i in 0..<j!.transforms.count {
+                j!.transforms[i] = parent.transform * j!.transforms[i]
+            }
+            updateTransformsToAbsolute(joints[skeleton_parts[j!.joint_name]!]!, ani: &ani)
+        }
     }
     
     
@@ -256,12 +268,12 @@ class Skeleton{
         print("Set new skeleton frame \(index)")
         for s in joints where s != nil{
             let i = joints.indexOf({ (e) -> Bool in return s === e })!
-            s!.matrix = (inv_bind_matrices[i] * animations[i]!.transforms[index])//.transpose
+            s!.matrix = (s!.inv_bind_pose * animations[i]!.transforms[index])//.transpose
             updateSkeleton(s!)
         }
         
+
+        
         self.delegate?.skeletonDidChangeAnimation()
     }
-    
-    
 }

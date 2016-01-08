@@ -144,4 +144,8 @@ class Model{
             }
         }
     }
+    
+    func runAnimation(){
+        
+    }
 }
