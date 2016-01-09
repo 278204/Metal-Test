@@ -26,7 +26,12 @@ class GameViewController:UIViewController{
         graphics.start((self.view.layer as? CAMetalLayer)!)
         let panner = UIPanGestureRecognizer(target: self, action: Selector("panned:"))
         panner.minimumNumberOfTouches = 1
+        panner.maximumNumberOfTouches = 1
         self.view.addGestureRecognizer(panner)
+        
+        let rotater = UIPanGestureRecognizer(target: self, action: Selector("rotated:"))
+        rotater.minimumNumberOfTouches = 2
+        self.view.addGestureRecognizer(rotater)
         
         let pincher = UIPinchGestureRecognizer(target: self, action: Selector("pinched:"))
         self.view.addGestureRecognizer(pincher)
@@ -83,16 +88,17 @@ class GameViewController:UIViewController{
     
     var skeleton_ani = 1
     func panned(panner : UIPanGestureRecognizer){
+        let position = panner.translationInView(self.view)
+        
+        let mesh = graphics.meshes[models[0].model_key]
+        mesh?.skeleton.setAnimation(Float(position.x / 320))
+    }
+    
+    func rotated(panner : UIPanGestureRecognizer){
         let translation = panner.translationInView(self.view)
-
-//        graphics.camera.moveOffset(float3(Float(translation.x * 0.01), Float(-translation.y * 0.01), 0))
         models[0].rotateY(Float(translation.x * CGFloat(1)))
         panner.setTranslation(CGPointZero, inView: self.view)
-        
-        if panner.state == .Ended {
-            let mesh = graphics.meshes[models[0].model_key]
-            mesh?.skeleton.setAnimation(skeleton_ani++ % 2)
-        }
+
     }
     
     func pinched(pincher : UIPinchGestureRecognizer){

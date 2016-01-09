@@ -15,6 +15,7 @@ class Joint {
     var transform : float4x4
     var inv_bind_pose : float4x4
     
+    
     let parent : Joint?
     
     init(name n : String, parent p : Joint?, inverse_bind_pose inv_b_p : float4x4){
@@ -23,6 +24,7 @@ class Joint {
         matrix = Matrix.Identity()
         transform = Matrix.Identity()
         inv_bind_pose = inv_b_p
+        
     }
     
     func isRoot() -> Bool{
@@ -38,15 +40,23 @@ class JointAnimation{
     let joint_name : String
     let times : [Float]
     var transforms : [float4x4]
+    var quaternions : [float4]
     
     init(joint_name jn : String, times t : [Float], transforms tfs: [float4x4]){
         joint_name = jn
         times = t
         transforms = tfs
+        quaternions = [float4](count: tfs.count, repeatedValue: float4())
     }
     
     func printOut(){
         print("Animation: \(joint_name)")
+    }
+    
+    func convertTransformToQuaternion(){
+        for i in 0..<transforms.count {
+            quaternions[i] = Quaternion.convertMatrix(transforms[i])
+        }
     }
 }
 
@@ -250,6 +260,10 @@ class Skeleton{
     
         
         updateTransformsToAbsolute(root_joint!, ani: &animations)
+        
+        for j_a in animations {
+            j_a?.convertTransformToQuaternion()
+        }
     }
     
     func updateTransformsToAbsolute(parent : Joint, inout ani : [JointAnimation?]){
@@ -271,9 +285,26 @@ class Skeleton{
             s!.matrix = (s!.inv_bind_pose * animations[i]!.transforms[index])//.transpose
             updateSkeleton(s!)
         }
-        
-
+    
+        self.delegate?.skeletonDidChangeAnimation()
+    }
+    
+    func setAnimation(t : Float){
+        print("Set new skeleton frame \(t)")
+        for i in 0..<joints.count where joints[i] != nil{
+            let s = joints[i]!
+            
+            let quat1 = animations[i]!.quaternions[0]
+            let quat2 = animations[i]!.quaternions[1]
+            
+            let quart = Quaternion.slerp(t, q1: quat1, q2: quat2)
+            
+            s.matrix = (s.inv_bind_pose * Quaternion.convertToMatrix(quart))//.transpose
+            updateSkeleton(s)
+        }
         
         self.delegate?.skeletonDidChangeAnimation()
     }
+    
+    
 }
