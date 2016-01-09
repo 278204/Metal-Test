@@ -41,12 +41,13 @@ class JointAnimation{
     let times : [Float]
     var transforms : [float4x4]
     var quaternions : [float4]
-    
+    var translates : [float4]
     init(joint_name jn : String, times t : [Float], transforms tfs: [float4x4]){
         joint_name = jn
         times = t
         transforms = tfs
         quaternions = [float4](count: tfs.count, repeatedValue: float4())
+        translates = [float4](count: tfs.count, repeatedValue: float4())
     }
     
     func printOut(){
@@ -55,7 +56,9 @@ class JointAnimation{
     
     func convertTransformToQuaternion(){
         for i in 0..<transforms.count {
-            quaternions[i] = Quaternion.convertMatrix(transforms[i])
+            quaternions[i] = QuatTrans.convertMatrixToQuaternion(transforms[i])
+            translates[i] = QuatTrans.convertMatrixToTranslation(transforms[i])
+//            quaternions[i].translate = QuatTrans.convertMatrixToTranslation(transforms[i])
         }
     }
 }
@@ -205,9 +208,11 @@ class Skeleton{
     }
     
     func updateSkeleton(joint : Joint){
-        let i = joints.indexOf({ (test_j) -> Bool in
-            return joint === test_j
-        })
+        
+        let i = skeleton_parts[joint.name]
+//        let i = joints.indexOf({ (test_j) -> Bool in
+//            return joint === test_j
+//        })
         if i != nil {
             updateSkeleton(joint, i: i!)
         } else{
@@ -297,9 +302,15 @@ class Skeleton{
             let quat1 = animations[i]!.quaternions[0]
             let quat2 = animations[i]!.quaternions[1]
             
-            let quart = Quaternion.slerp(t, q1: quat1, q2: quat2)
+            let trans1 = animations[i]!.translates[i]
             
-            s.matrix = (s.inv_bind_pose * Quaternion.convertToMatrix(quart))//.transpose
+            let interpolated_quart = Quaternion.slerp(t, q1: quat1, q2: quat2)
+            let interpolated_trans = trans1
+            let q_t = QuatTrans()
+            q_t.quaternion = interpolated_quart
+            q_t.translate = interpolated_trans
+            
+            s.matrix = (s.inv_bind_pose * q_t.convertToMatrix())// Quaternion.convertToMatrix(interpolated_quart))
             updateSkeleton(s)
         }
         
