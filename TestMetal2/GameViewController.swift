@@ -29,9 +29,9 @@ class GameViewController:UIViewController{
         panner.maximumNumberOfTouches = 1
         self.view.addGestureRecognizer(panner)
         
-        let rotater = UIPanGestureRecognizer(target: self, action: Selector("rotated:"))
-        rotater.minimumNumberOfTouches = 2
-        self.view.addGestureRecognizer(rotater)
+//        let rotater = UIPanGestureRecognizer(target: self, action: Selector("rotated:"))
+//        rotater.minimumNumberOfTouches = 2
+//        self.view.addGestureRecognizer(rotater)
         
         let pincher = UIPinchGestureRecognizer(target: self, action: Selector("pinched:"))
         self.view.addGestureRecognizer(pincher)
@@ -40,7 +40,7 @@ class GameViewController:UIViewController{
 //        presser.minimumPressDuration = 0.0
 //        self.view.addGestureRecognizer(presser)
 
-        addModel("pipe")
+        addModel("bigPipe")
         
         let floor = Model(name: "Floor")
         floor.hitbox = Box(origin:float3(-100, -100, -1), width: 200, height:99, depth: 2)
@@ -88,18 +88,16 @@ class GameViewController:UIViewController{
     
     var skeleton_ani = 1
     func panned(panner : UIPanGestureRecognizer){
-        let position = panner.translationInView(self.view)
         
-        let mesh = graphics.meshes[models[0].model_key]
-        mesh?.skeleton.setAnimation(Float(position.x / 320))
-    }
-    
-    func rotated(panner : UIPanGestureRecognizer){
         let translation = panner.translationInView(self.view)
         models[0].rotateY(Float(translation.x * CGFloat(1)))
         panner.setTranslation(CGPointZero, inView: self.view)
-
+//        let position = panner.translationInView(self.view)
+//        
+//        let mesh = graphics.meshes[models[0].model_key]
+//        mesh?.skeleton.setAnimation(Float(position.x / 320))
     }
+    
     
     func pinched(pincher : UIPinchGestureRecognizer){
         let scale = Float(pincher.scale)
@@ -142,6 +140,9 @@ class GameViewController:UIViewController{
             
             let rect = m.next_rect
             let l = quadTree.retrieveList(rect)
+            let mesh = graphics.meshes[m.model_key]
+            
+            mesh?.skeleton.runAnimation(Float(dt))
             
             for obj in l where (obj.model !== m) && (CGRectIntersectsRect(obj.rect, rect)){
                 m.handleIntersectWithRect(obj.rect)

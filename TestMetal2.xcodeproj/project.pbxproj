@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D1017DEF1C41597500CB6A5E /* SkeletonParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1017DEE1C41597500CB6A5E /* SkeletonParser.swift */; };
+		D1017DF11C42C51B00CB6A5E /* bigPipe.xml in Resources */ = {isa = PBXBuildFile; fileRef = D1017DF01C42C51B00CB6A5E /* bigPipe.xml */; };
 		D186469C1C3E926000BE5FE8 /* pipe.xml in Resources */ = {isa = PBXBuildFile; fileRef = D186469B1C3E926000BE5FE8 /* pipe.xml */; };
 		D196F7F01C3D1EA700A6E014 /* Stormtrooper.xml in Resources */ = {isa = PBXBuildFile; fileRef = D196F7EF1C3D1EA700A6E014 /* Stormtrooper.xml */; };
 		D196F8021C3D4A7F00A6E014 /* Repave.jpg in Resources */ = {isa = PBXBuildFile; fileRef = D196F8011C3D4A7F00A6E014 /* Repave.jpg */; };
@@ -64,6 +66,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		D1017DEE1C41597500CB6A5E /* SkeletonParser.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SkeletonParser.swift; sourceTree = "<group>"; };
+		D1017DF01C42C51B00CB6A5E /* bigPipe.xml */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xml; name = bigPipe.xml; path = ../../bigPipe.xml; sourceTree = "<group>"; };
 		D186469B1C3E926000BE5FE8 /* pipe.xml */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xml; name = pipe.xml; path = ../../pipe.xml; sourceTree = "<group>"; };
 		D196F7EE1C3D1BF100A6E014 /* TBXML.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TBXML.h; sourceTree = "<group>"; };
 		D196F7EF1C3D1EA700A6E014 /* Stormtrooper.xml */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xml; path = Stormtrooper.xml; sourceTree = "<group>"; };
@@ -185,6 +189,7 @@
 				D196F8011C3D4A7F00A6E014 /* Repave.jpg */,
 				D1B91B711C3BC48D0013E330 /* ArmyPilot.obj */,
 				D1F4120B1C3A721000769E80 /* teapot.obj */,
+				D1017DF01C42C51B00CB6A5E /* bigPipe.xml */,
 				D1F412171C3A9E1E00769E80 /* spot.obj */,
 				D1F412071C3A579F00769E80 /* Ball.obj */,
 				D196F7EF1C3D1EA700A6E014 /* Stormtrooper.xml */,
@@ -223,6 +228,7 @@
 				D1F412211C3ACCE600769E80 /* Camera.swift */,
 				D1F412241C3AE5D500769E80 /* Mesh.swift */,
 				D1FB18D91C3FEA99006032BC /* Skeleton.swift */,
+				D1017DEE1C41597500CB6A5E /* SkeletonParser.swift */,
 				D1F412261C3AEDBE00769E80 /* Misc.swift */,
 				D1F412091C3A5C3700769E80 /* OBJModel.swift */,
 				D1F4120D1C3A743D00769E80 /* Renderer.swift */,
@@ -356,6 +362,7 @@
 				D1B91B721C3BC48D0013E330 /* ArmyPilot.obj in Resources */,
 				D1F4121F1C3ACB7100769E80 /* Stormtrooper.png in Resources */,
 				D1F411DF1C3A527D00769E80 /* Main.storyboard in Resources */,
+				D1017DF11C42C51B00CB6A5E /* bigPipe.xml in Resources */,
 				D1F412081C3A579F00769E80 /* Ball.obj in Resources */,
 				D196F80A1C3E5C0D00A6E014 /* dude.xml in Resources */,
 				D1B91B741C3BC4950013E330 /* ArmyPilot.png in Resources */,
@@ -483,6 +490,7 @@
 				D1F4120E1C3A743D00769E80 /* Renderer.swift in Sources */,
 				D1F411D81C3A527D00769E80 /* AppDelegate.swift in Sources */,
 				D1F4122B1C3B8FA400769E80 /* Graphics.swift in Sources */,
+				D1017DEF1C41597500CB6A5E /* SkeletonParser.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

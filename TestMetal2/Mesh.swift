@@ -33,9 +33,10 @@ class Mesh : SkeletonDelegate {
         skeleton = Skeleton()
         skeleton.delegate = self
 
-        let i_b_p = skeleton.parseSkin(dict["skin"] as! [String : String], vertices: &objModel.groupVertices)
-        skeleton.parseSkeleton(dict["skeleton"] as! [[[String : String]]], inv_bind_matrices: i_b_p)
-        skeleton.parseAnimations(dict["animations"] as! [[String : String]])
+        skeleton.parse(dict, vertices: &objModel.groupVertices)
+//        let i_b_p = skeleton.parseSkin(dict["skin"] as! [String : String], vertices: &objModel.groupVertices)
+//        skeleton.parseSkeleton(dict["skeleton"] as! [[[String : String]]], inv_bind_matrices: i_b_p)
+//        skeleton.parseAnimations(dict["animations"] as! [[String : String]])
         
         objModel.endCurrentGroup()
 
