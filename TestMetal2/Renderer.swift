@@ -212,18 +212,21 @@ class Renderer {
         
         self.commandEncoder?.setVertexBuffer(mesh.vertexBuffer!, offset: 0, atIndex: 0)
         self.commandEncoder?.setVertexBuffer(uniformBuffer, offset: 0, atIndex: 1)
+        
         self.commandEncoder?.setVertexBuffer(mesh.skeletonBuffer!, offset: 0, atIndex: 2)
+       
         
         self.commandEncoder?.setFragmentBuffer(uniformBuffer, offset: 0, atIndex: 0)
         self.commandEncoder?.setFragmentTexture(mesh.texture, atIndex: 0)
         self.commandEncoder?.setFragmentSamplerState(self.sampler, atIndex: 0)
         
-        self.commandEncoder?.drawIndexedPrimitives(
-            MTLPrimitiveType.Triangle,
-            indexCount: Int(mesh.indexBuffer!.length / sizeof(UInt16)),
-            indexType: MTLIndexType.UInt16,
-            indexBuffer: mesh.indexBuffer!,
-            indexBufferOffset: 0)
+        self.commandEncoder?.drawPrimitives(.Triangle, vertexStart: 0, vertexCount: mesh.nr_vertices)
+//        self.commandEncoder?.drawIndexedPrimitives(
+//            MTLPrimitiveType.Triangle,
+//            indexCount: Int(mesh.indexBuffer!.length / sizeof(UInt16)),
+//            indexType: MTLIndexType.UInt16,
+//            indexBuffer: mesh.indexBuffer!,
+//            indexBufferOffset: 0)
     }
     
     func endFrame(){

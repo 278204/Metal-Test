@@ -29,18 +29,18 @@ class GameViewController:UIViewController{
         panner.maximumNumberOfTouches = 1
         self.view.addGestureRecognizer(panner)
         
-//        let rotater = UIPanGestureRecognizer(target: self, action: Selector("rotated:"))
-//        rotater.minimumNumberOfTouches = 2
-//        self.view.addGestureRecognizer(rotater)
+        let rotater = UIPanGestureRecognizer(target: self, action: Selector("pannedTwoFingers:"))
+        rotater.minimumNumberOfTouches = 2
+        self.view.addGestureRecognizer(rotater)
         
         let pincher = UIPinchGestureRecognizer(target: self, action: Selector("pinched:"))
         self.view.addGestureRecognizer(pincher)
 
-//        let presser = UILongPressGestureRecognizer(target: self, action: Selector("tapped:"))
-//        presser.minimumPressDuration = 0.0
-//        self.view.addGestureRecognizer(presser)
+        let presser = UILongPressGestureRecognizer(target: self, action: Selector("tapped:"))
+        presser.minimumPressDuration = 0.5
+        self.view.addGestureRecognizer(presser)
 
-        addModel("bigPipe")
+        addModel("SuperDude")
         
         let floor = Model(name: "Floor")
         floor.hitbox = Box(origin:float3(-100, -100, -1), width: 200, height:99, depth: 2)
@@ -78,7 +78,8 @@ class GameViewController:UIViewController{
         let delta = currentTime - lastTime
         
         if lastTime > 0 {
-            update(delta)
+            
+            update(delta * PhysicsSettings.gameSpeed)
         }
         
         lastTime = currentTime
@@ -90,14 +91,19 @@ class GameViewController:UIViewController{
     func panned(panner : UIPanGestureRecognizer){
         
         let translation = panner.translationInView(self.view)
-        models[0].rotateY(Float(translation.x * CGFloat(1)))
+        models[0].rotateY(Float(translation.x))
+        models[0].rotateX(Float(translation.y))
         panner.setTranslation(CGPointZero, inView: self.view)
-//        let position = panner.translationInView(self.view)
-//        
-//        let mesh = graphics.meshes[models[0].model_key]
-//        mesh?.skeleton.setAnimation(Float(position.x / 320))
+        
     }
     
+    func pannedTwoFingers(panner : UIPanGestureRecognizer){
+        
+        let translation = panner.translationInView(self.view)
+        models[0].moveBy(float3(Float(translation.x), Float(translation.y), 0))
+        panner.setTranslation(CGPointZero, inView: self.view)
+        
+    }
     
     func pinched(pincher : UIPinchGestureRecognizer){
         let scale = Float(pincher.scale)
@@ -111,6 +117,7 @@ class GameViewController:UIViewController{
         lastScale = scale
     }
     
+    var frame_index = 0
     func tapped(tapper : UITapGestureRecognizer){
         
         switch tapper.state{
@@ -123,6 +130,8 @@ class GameViewController:UIViewController{
         default:
             break
         }
+        let mesh = graphics.meshes[models[0].model_key]
+        mesh?.skeleton.runAnimation(0.1)
         
     }
     
@@ -140,8 +149,8 @@ class GameViewController:UIViewController{
             
             let rect = m.next_rect
             let l = quadTree.retrieveList(rect)
-            let mesh = graphics.meshes[m.model_key]
             
+            let mesh = graphics.meshes[m.model_key]
             mesh?.skeleton.runAnimation(Float(dt))
             
             for obj in l where (obj.model !== m) && (CGRectIntersectsRect(obj.rect, rect)){

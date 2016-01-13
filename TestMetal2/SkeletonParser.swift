@@ -18,8 +18,6 @@ class SkeletonParser{
         skeleton = sk
     }
     
-    
-    
     class func parseSkin(skin : [String:String], inout vertices : [Vertex], inout skeleton_parts : [String:Int]) -> [float4x4]{
         
 //        let name = skin["name"]!
@@ -64,7 +62,9 @@ class SkeletonParser{
         let joint_names = joints_string.componentsSeparatedByString(" ")
         for i in 0..<joint_names.count {
             let name = joint_names[i]
-            skeleton_parts[name] = i
+            if skeleton_parts[name] == nil {
+                skeleton_parts[name] = i
+            }
         }
         
         let index_array = weight_indicies_string.componentsSeparatedByString("||")
@@ -72,21 +72,43 @@ class SkeletonParser{
         let vcount_arr = index_array[1].componentsSeparatedByString(" ")
         let indicies = index_array[2].componentsSeparatedByString(" ")
         
-        for i in 0..<index_count where Int(vcount_arr[i]) > 0 {
+        var i = 0
+        var vert_i = 0
+        while vert_i < index_count{
             //WARNING, more than one v vount, make explode
-            let joint_i = Int(indicies[2*i])!
-            let weigth_i = Int(indicies[2*i + 1])!
-            print("Join i: \(joint_i), weight_i: \(weigth_i)")
-            var vert = vertices[i]
-            vert.bone1 = BoneType(joint_i)
-            vert.bone2 = BoneType(joint_i)
-            vert.weight1 = weights[weigth_i]
-            vert.weight2 = weights[weigth_i]
             
-            vertices[i] = vert
+            let first_index = 2*i
+            let joint_i = Int(indicies[first_index])!
+            let weigth_i = Int(indicies[first_index + 1])!
+            let vcount = Int(vcount_arr[vert_i])!
+            
+            print("Join i: \(joint_i), weight_i: \(weigth_i)")
+            var vert = Vertex()
+            
+            if vertices.count > vert_i {
+                vert = vertices[vert_i]
+            }
+            
+            vert.bone1 = BoneType(joint_i)
+            vert.weight1 = weights[weigth_i]
+            
+            if vcount == 2 {
+                let joint_i2 = Int(indicies[first_index+2])!
+                let weigth_i2 = Int(indicies[first_index + 3])!
+                vert.bone2 = BoneType(joint_i2)
+                vert.weight2 = weights[weigth_i2]
+            }
+
+            if vertices.count <= vert_i {
+                vertices.append(vert)
+            } else {
+                vertices[vert_i] = vert
+            }
+            
+            vert_i += 1
+            i += vcount
         }
         return inv_bind_matrices
-        
     }
     
     func parseSkeleton(structure : [[[String:String]]], inv_bind_matrices : [float4x4]){
@@ -105,7 +127,7 @@ class SkeletonParser{
                 var joint : Joint?
                 let index = skeleton.skeleton_parts[name]
                 
-                if parent.characters.count > 0 {
+                if parent.characters.count > 0 && index != nil {
                     joint = Joint(name: name, parent: parents[parent], inverse_bind_pose: inv_bind_matrices[index!])
                 } else{
                     joint = Joint(name: name, parent: nil, inverse_bind_pose: Matrix.Identity())
@@ -119,7 +141,7 @@ class SkeletonParser{
                     root = joint!
                     skeleton.root_joint = joint!
                 } else{
-                    print("ERROR, multiple roots?")
+                    print("ERROR, multiple roots? Perhaps non-deforming bone?")
                 }
             }
         }
@@ -127,6 +149,7 @@ class SkeletonParser{
 //        updateMatricesForChildren(root!)
         skeleton.root_joint!.temp = skeleton.root_joint!.transform
         
+        //WARNING: assumes root to leaf order in joints
         for i in 0..<skeleton.joints.count where skeleton.joints[i] != nil{
             let j = skeleton.joints[i]!
             j.temp = j.parent!.temp * j.transform
@@ -184,7 +207,6 @@ class SkeletonParser{
             
             while !scanner.atEnd {
                 let mat = Matrix.parseMatrix(scanner)
-                
                 transforms.append(mat)
             }
             
@@ -199,32 +221,38 @@ class SkeletonParser{
             }
             
             let a = JointAnimation(joint_name: joint_name, times: times, transforms: transforms)
+            a.convertTransformToQuaternion()
             a.printOut()
             
             
             let index = skeleton.skeleton_parts[joint_name]
-            skeleton.animations[index!] = a
+            if index != nil {
+                skeleton.animations[index!] = a
+            } else{
+                print("Found animation for non deform joint \(joint_name)")
+//                skeleton.animations.append(a)
+            }
             
         }
         
 //        updateTransformsToAbsolute(skeleton.root_joint!, ani: &skeleton.animations)
         
-        for j_a in skeleton.animations {
-            j_a?.convertTransformToQuaternion()
-        }
+//        for j_a in skeleton.animations {
+//            j_a?.convertTransformToQuaternion()
+//        }
     }
     
-    func updateTransformsToAbsolute(parent : Joint, inout ani : [JointAnimation?]){
-        //OPTIMAZE?
-        for j in ani where skeleton.joints[skeleton.skeleton_parts[j!.joint_name]!]!.parent === parent{
-            
-            for i in 0..<j!.transforms.count {
-                j!.transforms[i] = parent.transform * j!.transforms[i]
-            }
-            updateTransformsToAbsolute(skeleton.joints[skeleton.skeleton_parts[j!.joint_name]!]!, ani: &ani)
-        }
-    }
-    
+//    func updateTransformsToAbsolute(parent : Joint, inout ani : [JointAnimation?]){
+//        //OPTIMAZE?
+//        for j in ani where skeleton.joints[skeleton.skeleton_parts[j!.joint_name]!]!.parent === parent{
+//            
+//            for i in 0..<j!.transforms.count {
+//                j!.transforms[i] = parent.transform * j!.transforms[i]
+//            }
+//            updateTransformsToAbsolute(skeleton.joints[skeleton.skeleton_parts[j!.joint_name]!]!, ani: &ani)
+//        }
+//    }
+//    
 
     
 }

@@ -18,38 +18,38 @@ class Mesh : SkeletonDelegate {
     var hitbox          : Box?
     var transform       : float4x4?
     var skeleton        : Skeleton
-    
+    let nr_vertices     : Int
     
     init(name : String, renderer : Renderer){
 
-
-        let objModel = OBJModel()
-        
-        let dict = CPP_Wrapper().hello_cpp_wrapped(name) as! [String:AnyObject]
-        
-        let a = dict["geometry"] as! [String]
-        
-        let ret = objModel.importStrings(a[0] as String, indices_and_normals_string: a[2] as String, normals_string: a[1] as String, transform: a[3] as String, tex_string: a[4] as String)
         skeleton = Skeleton()
+        
+        let objModel = OBJModel()
+        let dict = CPP_Wrapper().hello_cpp_wrapped(name) as! [String:AnyObject]
+        let a = dict["geometry"] as! [String]
+        var vertices = [Vertex]()
+        
+        skeleton.parse(dict, vertices: &vertices)
+        
+        let ret = objModel.importStrings(a[0] as String, indices_and_normals_string: a[2] as String, normals_string: a[1] as String, transform: a[3] as String, tex_string: a[4] as String, skin: vertices)
+        
+        hitbox      = ret.0
+        transform   = ret.1
+        nr_vertices = ret.2
         skeleton.delegate = self
 
-        skeleton.parse(dict, vertices: &objModel.groupVertices)
-//        let i_b_p = skeleton.parseSkin(dict["skin"] as! [String : String], vertices: &objModel.groupVertices)
-//        skeleton.parseSkeleton(dict["skeleton"] as! [[[String : String]]], inv_bind_matrices: i_b_p)
-//        skeleton.parseAnimations(dict["animations"] as! [[String : String]])
+        
         
         objModel.endCurrentGroup()
 
-       
-        hitbox = ret.0
-        transform = ret.1
+  
         let group = objModel.groups[0]
         
         let skel_data = getSkeletonData()
         vertexBuffer = renderer.newBufferWithBytes(group.vertexData!.bytes, length: group.vertexData!.length)
-        indexBuffer = renderer.newBufferWithBytes(group.indexData!.bytes, length: group.indexData!.length)
+//        indexBuffer = renderer.newBufferWithBytes(group.indexData!.bytes, length: group.indexData!.length)
         skeletonBuffer = renderer.newBufferWithBytes(skel_data.bytes, length: skel_data.length)
-        texture = renderer.newTexture("Repave.jpg")!
+        texture = renderer.newTexture("Texture.png")!
     }
     
     func skeletonDidChangeAnimation() {
@@ -59,10 +59,17 @@ class Mesh : SkeletonDelegate {
     
     func getSkeletonData() -> NSData{
         let skeleton_matrices = NSMutableData()
-        for s in skeleton.joints where s != nil{
-            var mat = s!.matrix
+        
+        if skeleton.joints.count == 0 {
+            var mat = Matrix.Identity()
             skeleton_matrices.appendBytes(&mat, length: sizeof(float4x4))
+        } else {
+            for s in skeleton.joints where s != nil{
+                var mat = s!.matrix
+                skeleton_matrices.appendBytes(&mat, length: sizeof(float4x4))
+            }
         }
+        
         return skeleton_matrices
     }
     

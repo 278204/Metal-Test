@@ -66,10 +66,14 @@ vertex ProjectedVertex vertex_main(Vertex vert [[stage_in]],
     
     if(vert.bone1 >= 0){
         newpos = (bones[vert.bone1] * vert.position) * vert.weight1;
-        newnormal = (bones[vert.bone1] * newnormal) * vert.weight1;
+        newnormal = (bones[vert.bone1] * float4(vert.normal, 0.0)) * vert.weight1;
+    }
+    if(vert.bone2 >= 0){
+        newpos = (bones[vert.bone2] * vert.position) * vert.weight2 + newpos;
+        newnormal = (bones[vert.bone2] * float4(vert.normal, 0.0)) * vert.weight2 + newnormal;
     }
     
-    outVert.position = uniforms.modelViewProjectionMatrix * newpos;//float4(newpos.xyz, 1.0);
+    outVert.position = uniforms.modelViewProjectionMatrix * float4(newpos.xyz, 1.0);
     outVert.eyePosition = -(uniforms.modelViewMatrix * newpos).xyz;
     outVert.normal = uniforms.normalMatrix * newnormal.xyz;
     outVert.texCoords = vert.texCoords;

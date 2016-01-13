@@ -40,6 +40,10 @@
     }
     
     NSDictionary *skin_dict = [self parseSkinningData:root];
+    if(skin_dict == nil) {
+        return @{@"geometry":arr[0]};
+    }
+    
     NSArray *skeleton_array = [self parseSkeleton:root skeletonName:skin_dict[@"name"]];
     NSArray *animations = [self parseAllAnimations:root];
     
@@ -118,9 +122,14 @@
 
 
 -(NSDictionary *)parseSkinningData:(TBXMLElement *)root{
+    NSError *e = nil;
     TBXMLElement *library_controllers = [TBXML childElementNamed:@"library_controllers" parentElement:root];
     TBXMLElement *controller = [TBXML childElementNamed:@"controller" parentElement:library_controllers];
-    TBXMLElement *skin = [TBXML childElementNamed:@"skin" parentElement:controller];
+    TBXMLElement *skin = [TBXML childElementNamed:@"skin" parentElement:controller error:&e];
+    
+    if(e != nil) {
+        return nil;
+    }
     
     NSString *skeleton_id = [TBXML valueOfAttributeNamed:@"name" forElement:controller];
     

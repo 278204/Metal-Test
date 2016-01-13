@@ -71,17 +71,55 @@ class QuatTrans {
 class Quaternion {
     
     class func convertMatrix(mat : float4x4) -> float4 {
-        let qw = sqrt(1 + mat[0][0] + mat[1][1] + mat[2][2]) / 2
-        let qw4 = qw * 4
-        let qx = (mat[2][1] - mat[1][2])/qw4
-        let qy = (mat[0][2] - mat[2][0])/qw4
-        let qz = (mat[1][0] - mat[0][1])/qw4
+
+        let tr = mat[0][0] + mat[1][1] + mat[2][2]
         
-        return float4(qx, qy, qz, qw)
+        if tr > 0 {
+            let qw4 = 2.0 * sqrtf(1.0 + tr)
+            let qw = 0.25 * qw4
+            let qx = (mat[2][1] - mat[1][2]) / qw4
+            let qy = (mat[0][2] - mat[2][0]) / qw4
+            let qz = (mat[1][0] - mat[0][1]) / qw4
+            
+            return float4(qx, qy, qz, qw)
+            
+        } else if mat[0][0] > mat[1][1] && mat[0][0] > mat[2][2] {
+            
+            let qw4 = 2.0 * sqrtf(1.0 + mat[0][0] - mat[1][1] - mat[2][2])
+
+            let qw = (mat[2][1] - mat[1][2])/qw4
+            let qx = 0.25 * qw4
+            let qy = (mat[0][1] + mat[1][0])/qw4
+            let qz = (mat[0][2] + mat[2][0])/qw4
+            
+            return float4(qx, qy, qz, qw)
+            
+        } else if mat[1][1] > mat[2][2] {
+            
+            let qw4 = 2.0 * sqrtf(1.0 + mat[1][1] - mat[0][0] - mat[2][2])
+            
+            let qw = (mat[0][2] - mat[2][0])/qw4
+            let qx = (mat[0][1] + mat[1][0])/qw4
+            let qy = 0.25 * qw4
+            let qz = (mat[1][2] + mat[2][1])/qw4
+            return float4(qx, qy, qz, qw)
+            
+        } else{
+            let qw4 = 2.0 * sqrtf(1.0 + mat[2][2] - mat[0][0] - mat[1][1])
+        
+            let qw = (mat[1][0] - mat[0][1])/qw4
+            let qx = (mat[0][2] + mat[2][0])/qw4
+            let qy = (mat[1][2] + mat[2][1])/qw4
+            let qz = 0.25 * qw4
+            
+            return float4(qx, qy, qz, qw)
+        }
+        
+//        return float4(qx, qy, qz, qw)
     }
     
     class func convertToMatrix(q : float4) -> float4x4{
-        var mat1 = float4x4()
+        var mat1 = Matrix.Identity()
         mat1[0] = float4(q.w, -q.z, q.y, -q.x)
         mat1[1] = float4(q.z, q.w, -q.x, -q.y)
         mat1[2] = float4(-q.y, q.x, q.w, -q.z)
@@ -94,23 +132,67 @@ class Quaternion {
         mat2[3] = float4(-q.x, -q.y, -q.z, q.w)
         
         return mat1 * mat2
+        
+//        mat1[0][0] = 1 - 2 * q.y * q.y - 2 * q.z * q.z
+//        mat1[0][1] = 2 * q.x * q.y - 2 * q.z * q.w
+//        mat1[0][2] = 2 * q.x * q.z + 2 * q.y * q.w
+//        
+//        mat1[1][0] = 2 * q.x * q.y + 2 * q.z * q.w
+//        mat1[1][1] = 1 - 2 * q.x * q.x - 2 * q.z * q.z
+//        mat1[1][2] = 2 * q.y * q.z - 2 * q.x * q.w
+//        
+//        mat1[2][0] = 2 * q.x * q.z - 2 * q.y * q.w
+//        mat1[2][1] = 2 * q.y * q.z + 2 * q.x * q.w
+//        mat1[2][2] = 1 - 2 * q.x * q.x - 2 * q.y * q.y
+//        
+//        return mat1
+        
+//        let sqw = q.w * q.w
+//        let sqx = q.x * q.x
+//        let sqy = q.y * q.y
+//        let sqz = q.z * q.z
+//        
+//        let inv = 1 / (sqx + sqy + sqz + sqw)
+//        
+//        mat1[0][0] = ( sqx - sqy - sqz + sqw) * inv
+//        mat1[1][1] = (-sqx + sqy - sqz + sqw) * inv
+//        mat1[2][2] = (-sqx - sqy + sqz + sqw) * inv
+//        
+//        var tmp1 = q.x * q.y
+//        var tmp2 = q.z * q.w
+//        mat1[1][0] = 2.0 * (tmp1 + tmp2) * inv
+//        mat1[0][1] = 2.0 * (tmp1 - tmp2) * inv
+//        
+//        tmp1 = q.x * q.z
+//        tmp2 = q.y * q.w
+//        mat1[2][0] = 2.0 * (tmp1 - tmp2) * inv
+//        mat1[0][2] = 2.0 * (tmp1 + tmp2) * inv
+//        
+//        tmp1 = q.y * q.z
+//        tmp2 = q.x * q.w
+//        mat1[2][1] = 2.0 * (tmp1 + tmp2) * inv
+//        mat1[1][2] = 2.0 * (tmp1 - tmp2) * inv
+//        
+//        return mat1
+        
     }
     
     class func slerp(t : Float, q1 : float4, var q2 : float4) -> float4{
-        var cos_theta_div2 = q1.w * q2.w + q1.x * q2.x + q1.y * q2.y + q1.z * q2.z
-
-        //WARNING, unneccessary?
-        if cos_theta_div2 < 0 {
-            q2.w = -q2.w; q2.x = -q2.x; q2.y = -q2.y; q2.z = q2.z;
-            cos_theta_div2 = -cos_theta_div2
-        }
         
-        if cos_theta_div2 >= 1 {
+        let cos_theta_div2 = q1.w * q2.w + q1.x * q2.x + q1.y * q2.y + q1.z * q2.z
+
+//        //WARNING, unneccessary?
+//        if cos_theta_div2 < 0.0 {
+//            q2.w = -q2.w; q2.x = -q2.x; q2.y = -q2.y; q2.z = q2.z;
+//            cos_theta_div2 = -cos_theta_div2
+//        }
+        
+        if fabs(cos_theta_div2) >= 1.0 {
             return q1
         }
         
-        let theta_div2 = acos(cos_theta_div2)
-        let sin_theta_div2 = sqrt(1.0 - cos_theta_div2 * cos_theta_div2)
+        let theta_div2 = acosf(cos_theta_div2)
+        let sin_theta_div2 = sqrtf(1.0 - cos_theta_div2 * cos_theta_div2)
         
         if fabs(sin_theta_div2) < 0.001 {
             let qm = float4(q1.x * 0.5 + q2.x * 0.5,
@@ -120,13 +202,15 @@ class Quaternion {
             return qm
         }
         
-        let ratio_a = sin((1 - t) * theta_div2) / sin_theta_div2
-        let ratio_b = sin(t * theta_div2) / sin_theta_div2
+        let ratio_a = sinf((1 - t) * theta_div2) / sin_theta_div2
+        let ratio_b = sinf(t * theta_div2) / sin_theta_div2
         
-        let qm = float4(q1.x * ratio_a + q2.x * ratio_b,
+        let qm = float4(
+            q1.x * ratio_a + q2.x * ratio_b,
             q1.y * ratio_a + q2.y * ratio_b,
             q1.z * ratio_a + q2.z * ratio_b,
-            q1.w * ratio_a + q2.w * ratio_b)
+            q1.w * ratio_a + q2.w * ratio_b
+        )
         
         return qm
     }

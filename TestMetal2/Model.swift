@@ -70,6 +70,20 @@ class Model{
         
         self.transform = rotate_mat * self.transform
     }
+    func rotateX(y_delta : Float){
+        
+        var rotate_mat = Matrix.Identity()
+        
+        let theta = Math.DegToRad(y_delta)
+        let cos_r = cos(theta)
+        let sin_r = sin(theta)
+        rotate_mat[1][1] = cos_r
+        rotate_mat[2][1] = -sin_r
+        rotate_mat[1][2] = sin_r
+        rotate_mat[2][2] = cos_r
+        
+        self.transform = rotate_mat * self.transform
+    }
     
     func moveBy(offset : float3) {
         var pos = position

@@ -54,6 +54,7 @@ class JointAnimation{
     }
     
     func convertTransformToQuaternion(){
+
         for i in 0..<transforms.count {
             quaternions[i] = QuatTrans.convertMatrixToQuaternion(transforms[i])
             translates[i] = QuatTrans.convertMatrixToTranslation(transforms[i])
@@ -83,6 +84,11 @@ class Skeleton{
     
     func parse(dict : [String : AnyObject], inout vertices : [Vertex]){
         parser = SkeletonParser(skeleton: self)
+        
+        if dict["skin"] == nil {
+            return
+        }
+        
         let i_b_p = SkeletonParser.parseSkin(dict["skin"] as! [String : String], vertices: &vertices, skeleton_parts: &skeleton_parts)
         parser!.parseSkeleton(dict["skeleton"] as! [[[String : String]]], inv_bind_matrices: i_b_p)
         parser!.parseAnimations(dict["animations"] as! [[String : String]])
@@ -118,30 +124,32 @@ class Skeleton{
     
     func runAnimation(dt : Float){
 
+        guard animations.count > 0 else{
+            return
+        }
         currentTime += dt
         
         if animations.first!!.times.last < currentTime {
-            currentTime = 0
+            currentTime = animations.first!!.times.first!
         }
         
         var current_index = 0
         var next_index = 1
         
-        
-        for i in 0..<animations.first!!.times.count-1 where animations.first!!.times[i] < currentTime && animations.first!!.times[i+1] > currentTime{
+        for i in 0..<animations.first!!.times.count-1 where animations.first!!.times[i] < currentTime && animations.first!!.times[i+1] >= currentTime{
             current_index = i
             next_index = i+1
             break
         }
         
-        print("Animation \(currentTime)")
+        print("Animation \(currentTime) \(current_index) \(next_index)")
         
         
         for j in 0..<animations.count {
             let ani = animations[j]!
 
             
-            let t = (currentTime - ani.times[current_index]) / (ani.times[next_index] - ani.times[current_index])
+            let t = (currentTime - animations.first!!.times[current_index]) / (animations.first!!.times[next_index] - animations.first!!.times[current_index])
             
             
             let s = joints[j]!
@@ -149,34 +157,55 @@ class Skeleton{
             let quat1 = ani.quaternions[current_index]
             let quat2 = ani.quaternions[next_index]
             
-            let trans1 = ani.translates[0]
+            let trans1 = ani.translates[current_index]
+            let trans2 = ani.translates[next_index]
             
             let interpolated_quart = Quaternion.slerp(t, q1: quat1, q2: quat2)
-            let interpolated_trans = trans1
+            let interpolated_trans = t * trans2 + (1 - t) * trans1
             let q_t = QuatTrans()
             q_t.quaternion = interpolated_quart
             q_t.translate = interpolated_trans
             
+            //WARNING: assumes root to leaf order in joints
+            if s.name == "Torso" {
+                print("T \(t)")
+                if fabs(t) > 1 || t < 0{
+                    print("WARNING, t is \(t)")
+                }
+                print("Quat \(s.inv_bind_pose * quat1)")
+                print("Trans \(q_t.translate)")
+                q_t.convertToMatrix().printOut()
+            }
+            
             s.temp = s.parent!.temp * q_t.convertToMatrix()
-            s.matrix = (s.temp * s.inv_bind_pose)// Quaternion.convertToMatrix(interpolated_quart))
+            s.matrix = (s.temp * s.inv_bind_pose)
             updateSkeleton(s)
-            
-            
-//            setAnimation(t, currentIndex: current_index, nextIndex: next_index)
+        
         }
-    
+     
         self.delegate?.skeletonDidChangeAnimation()
         
     }
     
     func setAnimation(index : Int){
-        print("Set new skeleton frame \(index)")
-        for s in joints where s != nil{
-            let i = joints.indexOf({ (e) -> Bool in return s === e })!
-            s!.matrix = (s!.inv_bind_pose * animations[i]!.transforms[index])//.transpose
-            updateSkeleton(s!)
+        for j in 0..<animations.count {
+            let ani = animations[j]!
+            let s = joints[j]!
+            
+            let quat1 = ani.quaternions[index]
+            let trans1 = ani.translates[index]
+            
+            let q_t = QuatTrans()
+            q_t.quaternion = quat1
+            q_t.translate = trans1
+        
+            //WARNING: assumes root to leaf order in joints
+            s.temp = s.parent!.temp * q_t.convertToMatrix()
+            s.matrix = (s.temp * s.inv_bind_pose)
+            updateSkeleton(s)
+            
         }
-    
+        
         self.delegate?.skeletonDidChangeAnimation()
     }
     

@@ -11,4 +11,5 @@ import Foundation
 
 class PhysicsSettings {
     static let gravity = -9.82
+    static let gameSpeed : Double = 1.0
 }
