@@ -9,7 +9,12 @@
 import Foundation
 
 
-class PhysicsSettings {
+class Settings {
     static let gravity = -9.82
     static let gameSpeed : Double = 1.0
+    static let gridSize : Float = 2
+    static let zoomFactor : Float = 26
+    static let drawHitBox = false
+    
+    static let animations = ["LittleBoy" : ["jump", "resting", "wallSliding"]]
 }

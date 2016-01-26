@@ -100,11 +100,11 @@ class OBJModel {
     
     func importStrings(vertices_string : String, indices_and_normals_string : String, normals_string : String, transform : String, tex_string : String, skin : [Vertex]?) -> (Box, float4x4, Int){
         var vertices = [Vertex]()
-        var indicies = [IndexType]()
+        var positions = [float4]()
+        let indicies = [IndexType]()
         var normals  = [float3]()
         var matrix = float4x4()
         var tex_coords = [float2]()
-        var tex_coords_check = [String : Int]()
         
         let skipSet = NSCharacterSet.whitespaceAndNewlineCharacterSet()
         
@@ -140,9 +140,9 @@ class OBJModel {
             max_x = max(max_x, position.x)
             max_y = max(max_y, position.y)
             max_z = max(max_z, position.z)
-            
-            let vertex = Vertex(position: position, normal: float3(), texCoords: float2())
-            vertices.append(vertex)
+            positions.append(position)
+//            let vertex = Vertex(position: position, normal: float3(), texCoords: float2())
+//            vertices.append(vertex)
         }
 
         scanner = NSScanner(string: normals_string)
@@ -163,7 +163,7 @@ class OBJModel {
         
         scanner = NSScanner(string: tex_string)
         scanner.charactersToBeSkipped = skipSet
-        var nr_duplicates = 0
+
         while !scanner.atEnd {
             var s : Float = 0
             var t : Float = 0
@@ -173,19 +173,15 @@ class OBJModel {
             
             let tex = float2(s,t)
             tex_coords.append(tex)
-            if tex_coords_check["\(s) \(t)"] != 1 {
-                nr_duplicates += 1
-            }
-            tex_coords_check["\(s) \(t)"] = 1
         }
-        print("Nr of duplicated tex_coords found: \(nr_duplicates)")
+
         
         scanner = NSScanner(string: indices_and_normals_string)
         scanner.charactersToBeSkipped = skipSet
         
         var new_vertex_buffer = [(Vertex, Int)]()
-        
         var normal_buffer = [Int : float3]()
+        
         while !scanner.atEnd {
             
             for _ in 0..<3 {
@@ -197,9 +193,10 @@ class OBJModel {
                 scanner.scanInt(&ni)
                 scanner.scanInt(&ti)
                 
-                indicies.append(IndexType(new_vertex_buffer.count))
-                let vert = Vertex(position: vertices[Int(vi)].position, normal: normals[Int(ni)], texCoords: tex_coords[Int(ti)])
+//                indicies.append(IndexType(new_vertex_buffer.count))
+                let vert = Vertex(position: positions[Int(vi)], normal: normals[Int(ni)], texCoords: tex_coords[Int(ti)])
                 new_vertex_buffer.append((vert, Int(vi)))
+                
                 normal_buffer[Int(vi)] = vert.normal + (normal_buffer[Int(vi)] == nil ? float3() : normal_buffer[Int(vi)]!)
 //
 //                indicies.append(IndexType(vi))
@@ -209,21 +206,29 @@ class OBJModel {
         }
         
         vertices.removeAll()
-        for var (v,i) in new_vertex_buffer {
-            var normal = normal_buffer[i]!
+        
+        for (v_temp,i) in new_vertex_buffer {
+            var v = v_temp
+            let normal = normal_buffer[i]!
             let length = normal.length()
-            normal = normal / length
-            if skin != nil {
+            v.normal = normal / length
+            
+            if skin != nil && skin!.count > 0{
                 let skin_v = skin![i]
                 v.bone1 = skin_v.bone1
                 v.bone2 = skin_v.bone2
                 v.weight1 = skin_v.weight1
                 v.weight2 = skin_v.weight2
+                v.position = skin_v.bind_pose * v.position
+                if abs((v.weight1 + v.weight2) - 1.0) > 0.01 {
+                    print("ERROR, weights not close to 1: \(v.bone1) \(v.weight1) \(v.bone2) \(v.weight2)")
+                }
             }
-            v.normal = normal
+           
             vertices.append(v)
         }
         
+        print("Nr vertices total \(vertices.count)")
         
 //        for var v in vertices {
 //            var normal = v.normal
@@ -232,23 +237,20 @@ class OBJModel {
 //            v.normal = normal
 //        }
         
-        
-        
-        
-        
+
         if transform.characters.count == 0 {
             matrix = Matrix.Identity()
         } else{
             matrix = Matrix.parseMatrix(transform)
         }
         groupVertices = vertices
-        groupIndicies = indicies
+//        groupIndicies = indicies
 
         
         let origin = float3(min_x, min_y, min_z)
-        let width = max_x - min_x
-        let height = max_y - min_y
-        let depth = max_z - min_z
+        let width = (max_x - min_x)
+        let height = (max_y - min_y)
+        let depth = (max_z - min_z)
         
         let hitbox = Box(origin: origin, width: width, height: height, depth: depth)
         

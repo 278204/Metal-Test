@@ -14,6 +14,19 @@
 
 @implementation CPP_Wrapper
 
+- (NSDictionary *) importAnimaiton:(NSString *)name {
+    NSError *error = nil;
+    TBXML *xml = [TBXML newTBXMLWithXMLFile:[NSString stringWithFormat:@"%@.xml", name] error:&error];
+    TBXMLElement *root = xml.rootXMLElement;
+    
+    if(error) {
+        NSLog(@"Couldn't open file, %@", error.description);
+        return @{};
+    }
+    NSArray *animations = [self parseAllAnimations:root];
+    return @{@"animations" : animations};
+}
+
 - (NSDictionary *) hello_cpp_wrapped:(NSString *)name {
     
     NSError *error = nil;
@@ -86,7 +99,7 @@
     NSString *vertices_and_normals_indexes = [TBXML textForElement:p];
     
     TBXMLElement *first_node = [self traverseToChild:@[@"library_visual_scenes", @"visual_scene", @"node"] fromParent:root];
-    NSString *transform_matrix = [self getGeometryTransform:first_node];
+    NSString *transform_matrix = @"";//[self getGeometryTransform:first_node];
     NSLog(@"transform: %@", transform_matrix);
     return @[vertex_string, normals_string, vertices_and_normals_indexes, transform_matrix, tex_string];
 }
@@ -317,7 +330,7 @@
     TBXMLElement *sampler = [TBXML childElementNamed:@"sampler" parentElement:animation];
     NSString *input_src = [self findSource:sampler semantic:@"INPUT"];
     NSString *output_src = [self findSource:sampler semantic:@"OUTPUT"];
-    NSString *interpol_src = [self findSource:sampler semantic:@"INTERPOLATION"];
+//    NSString *interpol_src = [self findSource:sampler semantic:@"INTERPOLATION"];
     
     NSString *times = [self getFloatArrayFromSource:animation source:input_src];
     NSString *times_count = [self getFloatArrayCountFromSource:animation source:input_src];

@@ -19,10 +19,10 @@ struct Light
 };
 
 constant Light light = {
-    .direction = { 0.13, 0.72, 0.68 },
+    .direction = { 0, 1.0, 1.0 },
     .ambientColor = { 0.5, 0.5, 0.5 },
     .diffuseColor = { 1, 1, 1 },
-    .specularColor = { 0.2, 0.2, 0.2 }
+    .specularColor = { 0.0, 0.0, 0.0 }
 };
 
 constant float3 kSpecularColor= { 1, 1, 1 };
@@ -61,24 +61,30 @@ vertex ProjectedVertex vertex_main(Vertex vert [[stage_in]],
                                    constant float4x4 *bones    [[buffer(2)]])
 {
     ProjectedVertex outVert;
-    float4 newpos = vert.position;
-    float4 newnormal = float4(vert.normal, 0.0);
+    float4 newpos = float4(0,0,0,0);
+    float4 newnormal = float4(0,0,0,0);
     
-    if(vert.bone1 >= 0){
-        newpos = (bones[vert.bone1] * vert.position) * vert.weight1;
-        newnormal = (bones[vert.bone1] * float4(vert.normal, 0.0)) * vert.weight1;
-    }
-    if(vert.bone2 >= 0){
-        newpos = (bones[vert.bone2] * vert.position) * vert.weight2 + newpos;
-        newnormal = (bones[vert.bone2] * float4(vert.normal, 0.0)) * vert.weight2 + newnormal;
+    if(vert.bone1 >= 0 || vert.bone2 >= 0) {
+        if(vert.bone1 >= 0){
+            newpos += (bones[vert.bone1] * vert.position) * vert.weight1;
+            newnormal += (bones[vert.bone1] * float4(vert.normal, 0.0)) * vert.weight1;
+        }
+        if(vert.bone2 >= 0){
+            newpos += (bones[vert.bone2] * vert.position) * vert.weight2;
+            newnormal += (bones[vert.bone2] * float4(vert.normal, 0.0)) * vert.weight2;
+        }
+    } else{
+        newpos = vert.position;
+        newnormal = float4(vert.normal, 0);
     }
     
     outVert.position = uniforms.modelViewProjectionMatrix * float4(newpos.xyz, 1.0);
-    outVert.eyePosition = -(uniforms.modelViewMatrix * newpos).xyz;
+    outVert.eyePosition = -(uniforms.modelViewMatrix * float4(newpos.xyz, 1.0)).xyz;
     outVert.normal = uniforms.normalMatrix * newnormal.xyz;
     outVert.texCoords = vert.texCoords;
     return outVert;
 }
+
 
 fragment float4 fragment_main(ProjectedVertex vert [[stage_in]],
                               constant Uniforms &uniforms [[buffer(0)]],
@@ -104,3 +110,5 @@ fragment float4 fragment_main(ProjectedVertex vert [[stage_in]],
     
     return float4(ambientTerm + diffuseTerm + specularTerm, 1);
 }
+
+

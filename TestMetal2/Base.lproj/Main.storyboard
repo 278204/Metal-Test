@@ -22,5 +22,23 @@
                 <placeholder placeholderIdentifier="IBFirstResponder" id="SZV-WD-TEh" sceneMemberID="firstResponder"/>
             </objects>
         </scene>
+        <!--Level Editor2 View Controller-->
+        <scene sceneID="hPy-gO-2Cl">
+            <objects>
+                <viewController id="a7J-et-byV" customClass="LevelEditor2ViewController" customModule="TestMetal2" customModuleProvider="target" sceneMemberID="viewController">
+                    <layoutGuides>
+                        <viewControllerLayoutGuide type="top" id="Pmh-Be-Yjp"/>
+                        <viewControllerLayoutGuide type="bottom" id="XoI-lf-MFP"/>
+                    </layoutGuides>
+                    <view key="view" contentMode="scaleToFill" id="tzZ-T9-nTZ">
+                        <rect key="frame" x="0.0" y="0.0" width="600" height="600"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <color key="backgroundColor" white="1" alpha="1" colorSpace="calibratedWhite"/>
+                    </view>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="TLy-LR-MkY" userLabel="First Responder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="939" y="217"/>
+        </scene>
     </scenes>
 </document>

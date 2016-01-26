@@ -94,7 +94,7 @@ class Renderer {
         vertexDescriptor.attributes[6].bufferIndex = 0;
         vertexDescriptor.attributes[6].offset = Vertex.offsetForWeight2()
         
-        vertexDescriptor.layouts[0].stride = sizeof(Vertex)
+        vertexDescriptor.layouts[0].stride = Vertex.offsetForWeight2() + sizeof(Float)
         vertexDescriptor.layouts[0].stepFunction = MTLVertexStepFunction.PerVertex
         
         let pipelineDescriptor = MTLRenderPipelineDescriptor()
@@ -203,8 +203,8 @@ class Renderer {
         self.commandEncoder = self.commandBuffer?.renderCommandEncoderWithDescriptor(renderPass)
         self.commandEncoder?.setRenderPipelineState(self.pipeline!)
         self.commandEncoder?.setDepthStencilState(self.depthStencilState)
+        
         self.commandEncoder?.setFrontFacingWinding(MTLWinding.CounterClockwise)
-
         self.commandEncoder?.setCullMode(MTLCullMode.Back)
     }
     
@@ -221,12 +221,13 @@ class Renderer {
         self.commandEncoder?.setFragmentSamplerState(self.sampler, atIndex: 0)
         
         self.commandEncoder?.drawPrimitives(.Triangle, vertexStart: 0, vertexCount: mesh.nr_vertices)
-//        self.commandEncoder?.drawIndexedPrimitives(
-//            MTLPrimitiveType.Triangle,
-//            indexCount: Int(mesh.indexBuffer!.length / sizeof(UInt16)),
-//            indexType: MTLIndexType.UInt16,
-//            indexBuffer: mesh.indexBuffer!,
-//            indexBufferOffset: 0)
+    }
+    
+    func drawLineMesh(vertexBuffer : MTLBuffer, uniformBuffer : MTLBuffer, nrOfVertices : Int){
+        self.commandEncoder?.setVertexBuffer(vertexBuffer, offset: 0, atIndex: 0)
+        self.commandEncoder?.setVertexBuffer(uniformBuffer, offset: 0, atIndex: 1)
+        self.commandEncoder?.setFragmentBuffer(uniformBuffer, offset: 0, atIndex: 0)
+        self.commandEncoder?.drawPrimitives(.Line, vertexStart: 0, vertexCount: nrOfVertices)
     }
     
     func endFrame(){
@@ -242,8 +243,5 @@ class Renderer {
         return self.device!.newBufferWithBytes(bytes, length: length, options: MTLResourceOptions.OptionCPUCacheModeDefault)
     }
     
-    func newbufferWithBytesNoCopy(bytes : UnsafeMutablePointer<Void>, length : Int) -> MTLBuffer{
-        return (self.device?.newBufferWithBytesNoCopy(bytes, length: length, options: MTLResourceOptions.StorageModeShared, deallocator: nil))!
-    }
 
 }

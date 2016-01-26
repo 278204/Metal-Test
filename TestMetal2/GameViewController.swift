@@ -11,52 +11,68 @@ import Metal
 import MetalKit
 import simd
 
-class GameViewController:UIViewController{
+class GameViewController:UIViewController, ModelDelegate, GamePadDelegate{
     
     var models      = [Model]()
     let graphics    = Graphics()
     var lastScale   = Float(0.0)
     
     var displayLink : CADisplayLink?
-    let quadTree = QuadTree(level: 0, bounds: CGRect(x: -250, y: -250, width: 500, height: 500))
+    let quadTree = QuadTree(level: 0, bounds: CGRect(x: 0, y: 0, width: 500, height: 500))
     
     override func viewDidLoad() {
 
         super.viewDidLoad()
         graphics.start((self.view.layer as? CAMetalLayer)!)
-        let panner = UIPanGestureRecognizer(target: self, action: Selector("panned:"))
-        panner.minimumNumberOfTouches = 1
-        panner.maximumNumberOfTouches = 1
-        self.view.addGestureRecognizer(panner)
+        graphics.camera.moveOffset(float3(0,0,0))
+        
+        GamePad.shared.delegate = self
         
         let rotater = UIPanGestureRecognizer(target: self, action: Selector("pannedTwoFingers:"))
-        rotater.minimumNumberOfTouches = 2
+        rotater.minimumNumberOfTouches = 1
         self.view.addGestureRecognizer(rotater)
         
-        let pincher = UIPinchGestureRecognizer(target: self, action: Selector("pinched:"))
-        self.view.addGestureRecognizer(pincher)
 
-        let presser = UILongPressGestureRecognizer(target: self, action: Selector("tapped:"))
-        presser.minimumPressDuration = 0.5
-        self.view.addGestureRecognizer(presser)
-
-        addModel("SuperDude")
+        addModel("LittleBoy")
+        models[0].delegate = self
+        models[0].rotateX(-90)
+        models[0].rotateY(-90)
+        models[0].moveBy(float3(Settings.gridSize * 2, 15, 0))
+//        models[0].scale(5.0)
+        models[0].didUpdateHitbox()
         
-        let floor = Model(name: "Floor")
-        floor.hitbox = Box(origin:float3(-100, -100, -1), width: 200, height:99, depth: 2)
-        floor.dynamic = false
-        models.append(floor)
+        let level = Level()
+        level.importLevel("test.lvl")
+        print("level \(level.id) ")
         
+        
+        var i = 0
+        for o in level.objects {
+            let object_id = ObjectIDs(rawValue: o.id)
+            addModel("\(object_id!)")
+            models[i+1].dynamic = false
+            models[i+1].collision_bit = o.collision_bit
+            models[i+1].can_rest = o.can_rest
+            models[i+1].moveBy(float3(Float(o.x_pos) * Settings.gridSize, Float(o.y_pos) * Settings.gridSize,0))
+            i += 1
+        }
+       
     }
     
     func addModel(name : String){
         
         let mesh = graphics.addModel(name)
-        let m = Model(name: name)
+        let ro = RenderingObject(mesh_key: name)
         
-//        m.dynamic = false
+        ro.skeleton = mesh.skeleton
+        ro.skeletonBuffer = mesh.skeletonBuffer
+        let m = Model(name: name, renderingObject: ro)
+        
         m.hitbox = mesh.hitbox
-        m.transform = mesh.transform!
+
+        m.resetToOrigin()
+        m.hitbox?.printOut()
+        print("m.rect \(m.rect)")
         models.append(m)
         
         print("Added new model \(name), total nr models: \(models.count)")
@@ -79,89 +95,93 @@ class GameViewController:UIViewController{
         
         if lastTime > 0 {
             
-            update(delta * PhysicsSettings.gameSpeed)
+            update(delta * Settings.gameSpeed)
         }
         
         lastTime = currentTime
         
         graphics.redraw(models)
+        
+        if GamePad.shared.controllerConnected {
+            GamePad.shared.checkButtons()
+        }
     }
     
-    var skeleton_ani = 1
     func panned(panner : UIPanGestureRecognizer){
         
-        let translation = panner.translationInView(self.view)
-        models[0].rotateY(Float(translation.x))
-        models[0].rotateX(Float(translation.y))
-        panner.setTranslation(CGPointZero, inView: self.view)
         
     }
     
     func pannedTwoFingers(panner : UIPanGestureRecognizer){
         
         let translation = panner.translationInView(self.view)
-        models[0].moveBy(float3(Float(translation.x), Float(translation.y), 0))
+        models[0].rotateY(Float(translation.x))
         panner.setTranslation(CGPointZero, inView: self.view)
-        
     }
     
-    func pinched(pincher : UIPinchGestureRecognizer){
-        let scale = Float(pincher.scale)
-        if pincher.state == .Began {
-            
-        } else if pincher.state == .Changed {
-            let delta = scale - lastScale
-            graphics.camera.moveZ(delta * 10)
-        }
-        
-        lastScale = scale
-    }
-    
-    var frame_index = 0
-    func tapped(tapper : UITapGestureRecognizer){
-        
-        switch tapper.state{
-        case .Began:
-            models[0].jumpStart()
-        case .Ended:
-            models[0].jumpEnd()
-        case .Cancelled:
-            models[0].jumpEnd()
-        default:
-            break
-        }
-        let mesh = graphics.meshes[models[0].model_key]
-        mesh?.skeleton.runAnimation(0.1)
-        
-    }
     
     func update(dt : Double){
-        quadTree.clear()
-        for m in models {
-            
-             m.update(dt)
-            
-            let rect = m.next_rect
-            quadTree.insert((rect, m))
-        }
+//        quadTree.clear()
+//        for m in models where m.can_rest == false{
+//            if m.dynamic == true {
+//                m.update(Float(dt))
+//            }
+//            
+//            let rect = m.rect
+//            quadTree.insert((rect, m))
+//        }
         
-        for m in models where m.dynamic == true{
+        for m in models where m.dynamic == true && m.can_rest == false{
+//            let rect = m.rect
+//            let l = quadTree.retrieveList(rect)
+            m.update(Float(dt))
             
-            let rect = m.next_rect
-            let l = quadTree.retrieveList(rect)
             
-            let mesh = graphics.meshes[m.model_key]
-            mesh?.skeleton.runAnimation(Float(dt))
-            
-            for obj in l where (obj.model !== m) && (CGRectIntersectsRect(obj.rect, rect)){
-                m.handleIntersectWithRect(obj.rect)
+            for obj in models where (obj !== m) && obj.can_rest == false/* && (CGRectIntersectsRect(obj.rect, rect))*/{
+                m.handleIntersectWithRect(obj)
             }
             
             m.updateToNextRect()
+            if m === models[0] && m.position.y < -2 {
+                print("GameOver")
+            }
         }
     }
     
-
+    func modelDidChangePosition(model: Model) {
+        var cam_pos = graphics.camera.position
+        cam_pos.x = -max(model.position.x, 16)
+        cam_pos.y = -(model.position.y + 4)
+        graphics.camera.position = cam_pos
+        
+    }
+    
+    func gamePadDidPressButton(button: Button) {
+        print("Did press \(button)")
+        switch(button){
+        case .A:
+            models[0].jumpStart()
+        case .Left:
+            models[0].runLeft()
+        case .Right:
+            models[0].runRight()
+        default:
+            break
+        }
+    }
+    func gamePadDidReleaseButton(button: Button) {
+        print("Did release \(button)")
+        switch(button){
+        case .A:
+            models[0].jumpEnd()
+        case .Left:
+            models[0].stop()
+        case .Right:
+            models[0].stop()
+        default:
+            break
+        }
+    }
 
 }
 

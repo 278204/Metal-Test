@@ -39,6 +39,44 @@ class Matrix{
         
         return matrix
     }
+    
+    
+    class func rotationY(degrees : Float) ->float4x4 {
+        var rotate_mat = Matrix.Identity()
+        
+        let theta = Math.DegToRad(degrees)
+        let cos_r = cos(theta)
+        let sin_r = sin(theta)
+        rotate_mat[0][0] = cos_r
+        rotate_mat[2][0] = -sin_r
+        rotate_mat[0][2] = sin_r
+        rotate_mat[2][2] = cos_r
+        return rotate_mat
+    }
+    
+    class func rotationZ(degrees : Float) ->float4x4 {
+        var rotate_mat = Matrix.Identity()
+        
+        let theta = Math.DegToRad(degrees)
+        let cos_r = cos(theta)
+        let sin_r = sin(theta)
+        rotate_mat[0][0] = cos_r
+        rotate_mat[1][0] = -sin_r
+        rotate_mat[0][1] = sin_r
+        rotate_mat[1][1] = cos_r
+        return rotate_mat
+    }
+    class func rotationX(degrees : Float) -> float4x4{
+        var rotate_mat = Matrix.Identity()
+        let theta = Math.DegToRad(degrees)
+        let cos_r = cos(theta)
+        let sin_r = sin(theta)
+        rotate_mat[1][1] = cos_r
+        rotate_mat[2][1] = -sin_r
+        rotate_mat[1][2] = sin_r
+        rotate_mat[2][2] = cos_r
+        return rotate_mat
+    }
 }
 
 
@@ -60,62 +98,76 @@ class QuatTrans {
     }
     
     func convertToMatrix() -> float4x4{
-        let q = Quaternion.convertToMatrix(self.quaternion)
-        var mat_t = Matrix.Identity()
-        mat_t[3] = translate
-        
-        return mat_t * q
+        var q = Quaternion.convertToMatrix(self.quaternion)
+        q[3] = translate
+        q[0][3] = 0
+        return q
+//        var mat_t = Matrix.Identity()
+//        mat_t[3] = translate
+//        
+//        
+//        return mat_t * q
     }
 }
 
 class Quaternion {
     
+    class func copySign(v : Float, sign : Float) -> Float{
+        if sign > 0 && v > 0 || sign < 0 && v < 0 {
+            return v
+        } else{
+            return -v
+        }
+    }
     class func convertMatrix(mat : float4x4) -> float4 {
 
-        let tr = mat[0][0] + mat[1][1] + mat[2][2]
+        var qw : Float = 0;
+        var qx : Float = 1
+        var qy : Float = 0;
+        var qz : Float = 0;
+        var S : Float = 0;
         
-        if tr > 0 {
-            let qw4 = 2.0 * sqrtf(1.0 + tr)
-            let qw = 0.25 * qw4
-            let qx = (mat[2][1] - mat[1][2]) / qw4
-            let qy = (mat[0][2] - mat[2][0]) / qw4
-            let qz = (mat[1][0] - mat[0][1]) / qw4
-            
-            return float4(qx, qy, qz, qw)
-            
-        } else if mat[0][0] > mat[1][1] && mat[0][0] > mat[2][2] {
-            
-            let qw4 = 2.0 * sqrtf(1.0 + mat[0][0] - mat[1][1] - mat[2][2])
-
-            let qw = (mat[2][1] - mat[1][2])/qw4
-            let qx = 0.25 * qw4
-            let qy = (mat[0][1] + mat[1][0])/qw4
-            let qz = (mat[0][2] + mat[2][0])/qw4
-            
-            return float4(qx, qy, qz, qw)
-            
-        } else if mat[1][1] > mat[2][2] {
-            
-            let qw4 = 2.0 * sqrtf(1.0 + mat[1][1] - mat[0][0] - mat[2][2])
-            
-            let qw = (mat[0][2] - mat[2][0])/qw4
-            let qx = (mat[0][1] + mat[1][0])/qw4
-            let qy = 0.25 * qw4
-            let qz = (mat[1][2] + mat[2][1])/qw4
-            return float4(qx, qy, qz, qw)
-            
+        if( (mat[0][0] + mat[1][1] + mat[2][2]) > 0 ) {
+            S = 0.5 * sqrtf(mat[0][0] + mat[1][1] + mat[2][2] + 1)
+            qw = S;
+            qx = ( mat[2][1] - mat[1][2]) / (S * 4)
+            qy = ( mat[0][2] - mat[2][0] ) / (S * 4)
+            qz = ( mat[1][0] - mat[0][1] ) / (S * 4)
         } else{
-            let qw4 = 2.0 * sqrtf(1.0 + mat[2][2] - mat[0][0] - mat[1][1])
-        
-            let qw = (mat[1][0] - mat[0][1])/qw4
-            let qx = (mat[0][2] + mat[2][0])/qw4
-            let qy = (mat[1][2] + mat[2][1])/qw4
-            let qz = 0.25 * qw4
-            
-            return float4(qx, qy, qz, qw)
+            if mat[0][0] > mat[1][1] && mat[0][0] > mat[2][2] {
+                if (( 1.0 + mat[0][0] - mat[1][1] - mat[2][2] ) <= 0) {
+                    print("ERROR")
+                }
+                S = 2.0 * sqrtf( 1.0 + mat[0][0] - mat[1][1] - mat[2][2] )// S=4*qx
+                qw = (mat[2][1] - mat[1][2]) / S;
+                qx = 0.25 * S;
+                qy = (mat[0][1] + mat[1][0]) / S;
+                qz = (mat[0][2] + mat[2][0]) / S;
+            }
+//            else
+//            if (mat[1][1] > mat[2][2]) {
+//                if (( 1.0 + mat[1][1] - mat[0][0] - mat[2][2] ) <= 0) {
+//                    print("ERROR")
+//
+//                }
+//                S = 2.0 * sqrtf( 1.0 + mat[1][1] - mat[0][0] - mat[2][2]) // S=4*qy
+//                qw = (mat[0][2] - mat[2][0]) / S;
+//                qx = (mat[0][1] + mat[1][0]) / S;
+//                qy = 0.25 * S;
+//                qz = (mat[1][2] + mat[2][1]) / S; 
+//            }
+            else {
+                if (( 1.0 + mat[2][2] - mat[0][0] - mat[1][1] ) <= 0) {
+                    print("ERROR")
+                }
+                S = 2.0 * sqrtf( 1.0 + mat[2][2] - mat[0][0] - mat[1][1] ) // S=4*qz
+                qw = (mat[1][0] - mat[0][1]) / S;
+                qx = (mat[0][2] + mat[2][0]) / S; 
+                qy = (mat[1][2] + mat[2][1]) / S; 
+                qz = 0.25 * S;
+            }
         }
-        
-//        return float4(qx, qy, qz, qw)
+        return float4(qx, qy, qz, qw)
     }
     
     class func convertToMatrix(q : float4) -> float4x4{
@@ -146,7 +198,7 @@ class Quaternion {
 //        mat1[2][2] = 1 - 2 * q.x * q.x - 2 * q.y * q.y
 //        
 //        return mat1
-        
+//
 //        let sqw = q.w * q.w
 //        let sqx = q.x * q.x
 //        let sqy = q.y * q.y
@@ -179,13 +231,13 @@ class Quaternion {
     
     class func slerp(t : Float, q1 : float4, var q2 : float4) -> float4{
         
-        let cos_theta_div2 = q1.w * q2.w + q1.x * q2.x + q1.y * q2.y + q1.z * q2.z
+        var cos_theta_div2 = q1.w * q2.w + q1.x * q2.x + q1.y * q2.y + q1.z * q2.z
 
-//        //WARNING, unneccessary?
-//        if cos_theta_div2 < 0.0 {
-//            q2.w = -q2.w; q2.x = -q2.x; q2.y = -q2.y; q2.z = q2.z;
-//            cos_theta_div2 = -cos_theta_div2
-//        }
+////        //WARNING, unneccessary?
+        if cos_theta_div2 < 0.0 {
+            q2.w = -q2.w; q2.x = -q2.x; q2.y = -q2.y; q2.z = q2.z;
+            cos_theta_div2 = -cos_theta_div2
+        }
         
         if fabs(cos_theta_div2) >= 1.0 {
             return q1
@@ -221,6 +273,12 @@ class Math {
     class func DegToRad(deg : Float) -> Float{
         return deg * (Float(M_PI) / 180.0);
     }
+    class func sign(v : CGFloat)->Int8{
+        return v < 0 ? -1 : 1
+    }
+    class func sign(v : Float)->Int8{
+        return v < 0 ? -1 : 1
+    }
 }
 
 func / (left : float3, right : Float) ->float3 {
@@ -228,6 +286,29 @@ func / (left : float3, right : Float) ->float3 {
     l.x = l.x/right
     l.y = l.y/right
     l.z = l.z/right
+    return l
+}
+
+func * (left : CGPoint, right : CGPoint) -> CGPoint {
+    return CGPoint(x: left.x * right.x, y: left.y * right.y)
+}
+
+func * (left : CGPoint, right : CGFloat) -> CGPoint {
+    return CGPoint(x: left.x * right, y: left.y * right)
+}
+
+func + (left : CGPoint, right : CGPoint) -> CGPoint {
+    return CGPoint(x: left.x + right.x, y: left.y + right.y)
+}
+
+func - (left : CGPoint, right : CGPoint) -> CGPoint {
+    return CGPoint(x: left.x - right.x, y: left.y - right.y)
+}
+
+func * (left:float2, right : Float) -> float2 {
+    var l = left
+    l.x = l.x * right
+    l.y = l.y * right
     return l
 }
 
@@ -241,6 +322,8 @@ extension float4 {
         return float3(x, y, z)
     }
 }
+
+
 extension float4x4 {
     func printOut(){
         print("Matrix:")

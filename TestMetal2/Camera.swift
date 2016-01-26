@@ -10,30 +10,29 @@ import Foundation
 import simd
 
 class Camera {
-    var matrix : float4x4
+    var view_matrix : float4x4
+    var projection_matrix = Matrix.Identity()
     var position : float3   {didSet{positionDidSet()}}
-    var aspect : Float = 0
+    var aspect : Float = 0 {didSet{
+        //perspecitveProjection(aspect, fovy: Math.DegToRad(95), near: 1, far: 100)
+        }}
     
     init() {
-        matrix = Matrix.Identity()
-        position = float3(0,0,-2)
-        positionDidSet()
+        view_matrix = Matrix.Identity()
+        position = float3(0,0,0)
+        
     }
     
     func positionDidSet(){
-        matrix[3].x = position.x
-        matrix[3].y = position.y
-        matrix[3].z = position.z
+        view_matrix[3].x = position.x
+        view_matrix[3].y = position.y
+        view_matrix[3].z = position.z
     }
     
     func getUniform(modelMatrix : float4x4) -> Uniforms {
-        let near : Float = 1
-        let far : Float = 100
 
-        let projectionMatrix = perspecitveProjection(aspect, fovy: Math.DegToRad(95), near: near, far: far)
-        
-        let modelView = self.matrix * modelMatrix
-        let modelViewProj = projectionMatrix * modelView
+        let modelView = self.view_matrix * modelMatrix
+        let modelViewProj = projection_matrix * modelView
         var normalMatrix = float3x3()
         normalMatrix[0] = modelView[0].xyz()
         normalMatrix[1] = modelView[1].xyz()
@@ -57,6 +56,9 @@ class Camera {
         position = pos
     }
     
+    func setFrustum(right : Float, top : Float){
+        projection_matrix = parallelProjection(right: right, left: -right, top: top, bottom: -top, far: 200, near: -200)
+    }
     
     private func perspecitveProjection(aspect : Float, fovy : Float, near : Float, far : Float) -> float4x4{
         let yScale : Float = 1 / tan(fovy * 0.5)
@@ -71,6 +73,19 @@ class Camera {
         matrix[2][3] = wzScale
         return matrix
         
+    }
+    
+    private func parallelProjection(right r : Float, left l : Float, top t : Float, bottom b : Float, far f : Float, near n : Float) -> float4x4{
+        
+        var mat = float4x4(diagonal: float4(2/(r - l), 2/(t - b), -2/(f - n), 1))
+        mat[3][0] = -(r + l)/(r - l)
+        mat[3][1] = -(t + b)/(t - b)
+        mat[3][2] = 0.4//(f + n)/(f - n)
+        
+//        let mat = float4x4(diagonal: float4(1,1,0,1))
+        
+        
+        return mat
     }
     
 

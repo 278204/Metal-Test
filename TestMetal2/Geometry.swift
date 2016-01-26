@@ -24,6 +24,31 @@ struct Box{
     func rect() -> CGRect {
         return CGRect(x: CGFloat(origin.x), y: CGFloat(origin.y), width: CGFloat(width), height: CGFloat(height))
     }
+    
+    mutating func rotateX(degrees : Float){
+        let p1 = float4(origin.x, origin.y, origin.z, 1.0)
+        let p2 = float4(origin.x + width, origin.y + height, origin.z + depth, 1.0)
+        
+        let rotation_x = Matrix.rotationX(degrees)
+        let p1_rot = rotation_x * p1
+        let p2_rot = rotation_x * p2
+        origin = p1_rot.xyz()
+        width = abs(p2_rot.x - p1_rot.x)
+        height = abs(p2_rot.y - p1_rot.y)
+        depth = abs(p2_rot.z - p1_rot.z)
+    }
+    mutating func rotateY(degrees : Float){
+        let p1 = float4(origin.x, origin.y, origin.z, 1.0)
+        let p2 = float4(origin.x + width, origin.y + height, origin.z + depth, 1.0)
+        
+        let rotation_x = Matrix.rotationY(degrees)
+        let p1_rot = rotation_x * p1
+        let p2_rot = rotation_x * p2
+        origin = p1_rot.xyz()
+        width = abs(p2_rot.x - p1_rot.x)
+        height = abs(p2_rot.y - p1_rot.y)
+        depth = abs(p2_rot.z - p1_rot.z)
+    }
 }
 
 
@@ -37,7 +62,8 @@ struct Vertex {
     var bone2 : BoneType
     var weight1 : Float
     var weight2 : Float
-
+    var bind_pose : float4x4
+    
     init(position p : float4, normal n : float3, texCoords t : float2){
         position = p
         normal = n
@@ -46,6 +72,7 @@ struct Vertex {
         bone2 = -1
         weight1 = 0
         weight2 = 0
+        bind_pose = Matrix.Identity()
     }
     
     init(){
@@ -56,6 +83,7 @@ struct Vertex {
         bone2 = -1
         weight1 = 0
         weight2 = 0
+        bind_pose = Matrix.Identity()
     }
     
     func toData() -> NSData {
@@ -97,5 +125,146 @@ struct Vertex {
     }
     static func offsetForWeight2() -> Int{
         return offsetForWeight1() + sizeof(Float)
+    }
+}
+
+class HitTest{
+    
+    static func intersectTop(tl : CGPoint, tr : CGPoint, rect : CGRect) -> CGFloat{
+        let ry2 = rect.origin.y + rect.height
+        let rx = rect.origin.x
+        let rx2 = rect.origin.x + rect.width
+        if tl.y < ry2 && tl.y > rect.origin.y{
+            if rx > tr.x || rx2 < tl.x {
+                return 0.0
+            } else {
+                return rect.origin.y - tl.y
+            }
+        }
+        return 0.0
+    }
+    
+    
+    static func intersectBottom(bl : CGPoint, br : CGPoint, rect : CGRect) -> CGFloat{
+        let ry2 = rect.origin.y + rect.height
+        let rx = rect.origin.x
+        let rx2 = rect.origin.x + rect.width
+        if bl.y < ry2 && bl.y > rect.origin.y{
+            if rx > br.x || rx2 < bl.x {
+                return 0.0
+            } else {
+                return ry2 - bl.y
+            }
+        }
+        return 0.0
+    }
+    
+    static func intersectRight(r1 : CGPoint, r2 : CGPoint, rect : CGRect) -> CGFloat{
+        let ry = rect.origin.y
+        let ry2 = rect.origin.y + rect.height
+        
+        if r1.x > rect.origin.x && r1.x < rect.origin.x + rect.width {
+            if ry > r2.y || ry2 < r1.y {
+                return 0.0
+            } else{
+                return r1.x - rect.origin.x
+            }
+        }
+        return 0.0
+    }
+    
+    static func intersectLeft(l1 : CGPoint, l2 : CGPoint, rect : CGRect) -> CGFloat{
+        let ry = rect.origin.y
+        let ry2 = rect.origin.y + rect.height
+        
+        if l1.x > rect.origin.x && l1.x < rect.origin.x + rect.width {
+            if ry > l2.y || ry2 < l1.y {
+                return 0.0
+            } else{
+                return rect.origin.x + rect.width - l1.x
+            }
+        }
+        return 0.0
+    }
+    
+    static func crossesTop(cur_rect : CGRect, nxt_rect : CGRect, rect : CGRect) -> Bool{
+        let rect_bottom =  rect.origin.y
+        return cur_rect.origin.y + cur_rect.height <= rect_bottom && nxt_rect.origin.y + nxt_rect.height > rect_bottom
+    }
+    static func crossesBottom(cur_rect : CGRect, nxt_rect : CGRect, rect : CGRect) -> Bool{
+        let rect_top =  rect.origin.y + rect.height
+        return cur_rect.origin.y >= rect_top && nxt_rect.origin.y < rect_top
+    }
+    static func crossesRight(cur_rect : CGRect, nxt_rect : CGRect, rect : CGRect) -> Bool{
+        let rect_left = rect.origin.x
+        return cur_rect.origin.x + cur_rect.width <= rect_left && nxt_rect.origin.x + nxt_rect.width > rect_left
+    }
+    static func crossesLeft(cur_rect : CGRect, nxt_rect : CGRect, rect : CGRect) -> Bool{
+        let rect_right = rect.origin.x + rect.width
+        return cur_rect.origin.x >= rect_right && nxt_rect.origin.x < rect_right
+    }
+}
+
+class AABB {
+    var origin = float2(0,0)
+    var height : Float = 0.0
+    var width : Float = 0.0
+    
+    
+    init(origin o : float2, size : float2){
+        origin = o
+        width = size.x
+        height = size.y
+        
+    }
+    init(rect : CGRect){
+        origin = float2(Float(rect.origin.x), Float(rect.origin.y))
+        width = Float(rect.width)
+        height = Float(rect.height)
+    }
+    func get_min() -> float2{
+        return origin
+    }
+    func get_max() -> float2{
+        return origin + get_size()
+    }
+    func get_size() -> float2{
+        return float2(width, height)
+    }
+    
+    func minkowskiDifference(other : AABB) -> AABB{
+        let top_left = origin - other.get_max()
+        let full_size = get_size() + other.get_size()
+        return AABB(origin: top_left, size: full_size)
+    }
+    
+    func closestPointOnBoundsToOrigin(bits : UInt8) -> (float2, Direction){
+        
+        let point = float2(0,0)
+        let max = get_max()
+        var direction = Direction.Left
+        var min_dist : Float = abs(point.x - origin.x)
+        var boundsPoints = float2(origin.x, point.y)
+        
+        if (bits & 0b0001 == 0) && abs(max.x - point.x) < min_dist {
+            direction = .Right
+            min_dist = abs(max.x - point.x)
+            boundsPoints = float2(max.x, point.y)
+        }
+        
+        if (bits & 0b1000 == 0) && abs(max.y - point.y) < min_dist { // Top
+            direction = .Top
+            min_dist = abs(max.y - point.y)
+            boundsPoints = float2(point.x, max.y)
+        }
+        
+        if (bits & 0b0010 == 0) && abs(origin.y - point.y) < min_dist { // Bottom
+            direction = .Bottom
+            print("top")
+            min_dist = abs(origin.y - point.y)
+            boundsPoints = float2(point.x, origin.y)
+        }
+        
+        return (boundsPoints, direction)
     }
 }

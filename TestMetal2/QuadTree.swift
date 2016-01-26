@@ -13,7 +13,7 @@ import UIKit
 typealias Rect_Obj = (rect : CGRect, model : Model)
 class QuadTree{
     let MAX_OBJECTS = 10
-    let MAX_LEVELS = 5
+    let MAX_LEVELS = 20
     
     let level : Int
     var objects = [Rect_Obj]()
@@ -33,6 +33,7 @@ class QuadTree{
             nodes[i]?.clear()
             nodes[i] = nil
         }
+        
     }
     
     private func split(){
@@ -87,7 +88,7 @@ class QuadTree{
         
         objects.append(obj)
         
-        if objects.count > MAX_OBJECTS && level < MAX_LEVELS {
+        if objects.count >= MAX_OBJECTS && level < MAX_LEVELS {
             if nodes[0] == nil {
                 split()
             }
