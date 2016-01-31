@@ -101,7 +101,7 @@ class OBJModel {
     func importStrings(vertices_string : String, indices_and_normals_string : String, normals_string : String, transform : String, tex_string : String, skin : [Vertex]?) -> (Box, float4x4, Int){
         var vertices = [Vertex]()
         var positions = [float4]()
-        let indicies = [IndexType]()
+//        let indicies = [IndexType]()
         var normals  = [float3]()
         var matrix = float4x4()
         var tex_coords = [float2]()

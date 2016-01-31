@@ -15,6 +15,6 @@ class Settings {
     static let gridSize : Float = 2
     static let zoomFactor : Float = 26
     static let drawHitBox = false
-    
-    static let animations = ["LittleBoy" : ["jump", "resting", "wallSliding"]]
+    static let showRedObjectsInQuad = false
+    static let animations = ["LittleBoy" : ["jump", "resting", "wallSliding", "fall"]]
 }

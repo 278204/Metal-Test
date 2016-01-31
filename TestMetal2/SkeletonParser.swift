@@ -112,10 +112,7 @@ class SkeletonParser{
 
                 vert.bone2 = BoneType(skeleton.skeleton_parts[index_map[joint_i2]!]!)
                 vert.weight2 = weights[weigth_i2]
-                
-                if index_map[joint_i2] == "Toe_L" {
-                    print("\(index_map[joint_i]) skin \(vert.weight2) \(vcount)")
-                }
+            
                 if vert.weight2 > vert.weight1 {
                     let bone_temp = vert.bone2
                     let weight_temp = vert.weight2
@@ -127,12 +124,7 @@ class SkeletonParser{
             } else if vcount > 2 {
                 print("ERROR, can't handle vcount higher than 2")
             }
-            
-            if index_map[joint_i] == "Toe_L" {
-                print("Foot skin \(vert.weight1) \(vcount)")
-            }
-            
-
+    
             if vertices.count <= vert_i {
                 vertices.append(vert)
             } else {
@@ -141,7 +133,6 @@ class SkeletonParser{
 
             i += vcount
         }
-        print("vert count \(vertices.count)")
         
         skeleton.root_joint!.temp = skeleton.root_joint!.transform
         //WARNING: assumes root to leaf order in joints

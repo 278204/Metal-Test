@@ -17,8 +17,9 @@ enum Button {
     case Y
     case Left
     case Right
+    case LeftTrigger
     
-    static let allValues = [Button.A, .B, .X, .Y, .Left, .Right]
+    static let allValues = [Button.A, .B, .X, .Y, .Left, .Right, .LeftTrigger]
 }
 
 protocol GamePadDelegate {
@@ -33,6 +34,7 @@ class GamePad : NSObject{
     var controller_type : Int = 0
     var delegate : GamePadDelegate?
     var key_map = [Button : Bool]()
+    
     
     override init(){
         super.init()
@@ -53,21 +55,25 @@ class GamePad : NSObject{
             print("No controller is connected")
             return
         }
-        let profile = self.gameController!.gamepad!
+        let profile_o = self.gameController!.extendedGamepad
         
-        for b in Button.allValues {
-            let isPressed = buttonIsPressed(b, profile: profile)
-            if isPressed && !key_map[b]! {
-                self.delegate?.gamePadDidPressButton(b)
-                key_map[b] = true
-            } else if !isPressed && key_map[b]! {
-                self.delegate?.gamePadDidReleaseButton(b)
-                key_map[b] = false
+        
+        if profile_o != nil{
+            let profile = profile_o!
+            for b in Button.allValues {
+                let isPressed = buttonIsPressed(b, profile: profile)
+                if isPressed && !key_map[b]! {
+                    self.delegate?.gamePadDidPressButton(b)
+                    key_map[b] = true
+                } else if !isPressed && key_map[b]! {
+                    self.delegate?.gamePadDidReleaseButton(b)
+                    key_map[b] = false
+                }
             }
         }
     }
     
-    func buttonIsPressed(button : Button, profile : GCGamepad) -> Bool {
+    func buttonIsPressed(button : Button, profile : GCExtendedGamepad) -> Bool {
         switch(button){
         case .A:
             return profile.buttonA.pressed
@@ -81,6 +87,8 @@ class GamePad : NSObject{
             return profile.dpad.left.pressed
         case .Right:
             return profile.dpad.right.pressed
+        case .LeftTrigger:
+            return profile.leftTrigger.pressed
         }
         
     }

@@ -16,7 +16,7 @@
 
 - (NSDictionary *) importAnimaiton:(NSString *)name {
     NSError *error = nil;
-    TBXML *xml = [TBXML newTBXMLWithXMLFile:[NSString stringWithFormat:@"%@.xml", name] error:&error];
+    TBXML *xml = [TBXML newTBXMLWithXMLFile:name fileExtension:@"dae" error:&error];
     TBXMLElement *root = xml.rootXMLElement;
     
     if(error) {
@@ -30,7 +30,7 @@
 - (NSDictionary *) hello_cpp_wrapped:(NSString *)name {
     
     NSError *error = nil;
-    TBXML *xml = [TBXML newTBXMLWithXMLFile:[NSString stringWithFormat:@"%@.xml", name] error:&error];
+    TBXML *xml = [TBXML newTBXMLWithXMLFile:name fileExtension:@"dae" error:&error];
     
     
     if(error) {
@@ -42,8 +42,7 @@
     TBXMLElement *geometry = [self traverseToChild:@[@"library_geometries", @"geometry"] fromParent:root];
     NSMutableArray *arr = [[NSMutableArray alloc] init];
     while(error == nil) {
-        NSString *geometry_id = [TBXML valueOfAttributeNamed:@"id" forElement:geometry];
-        NSLog(@"Parsing: %@", geometry_id);
+//        NSString *geometry_id = [TBXML valueOfAttributeNamed:@"id" forElement:geometry];
         TBXMLElement *source = [self traverseToChild:@[@"mesh", @"source"] fromParent:geometry];
         
         NSArray *a = [self parse:source root:root];
@@ -72,18 +71,16 @@
     if([source_id rangeOfString:@"-positions"].location != NSNotFound){
         
         TBXMLElement *floats = [TBXML childElementNamed:@"float_array" parentElement:source];
-        int count = [[TBXML valueOfAttributeNamed:@"count" forElement:floats] intValue];
+//        int count = [[TBXML valueOfAttributeNamed:@"count" forElement:floats] intValue];
         vertex_string = [TBXML textForElement:floats];
-        NSLog(@"Parse vertices, floats %d", count);
     }
     
     source = [TBXML nextSiblingNamed:@"source" searchFromElement:source];
     source_id = [TBXML valueOfAttributeNamed:@"id" forElement:source];
     if([source_id rangeOfString:@"-normals"].location != NSNotFound){
         TBXMLElement *floats = [TBXML childElementNamed:@"float_array" parentElement:source];
-        int count = [[TBXML valueOfAttributeNamed:@"count" forElement:floats] intValue];
+//        int count = [[TBXML valueOfAttributeNamed:@"count" forElement:floats] intValue];
         normals_string = [TBXML textForElement:floats];
-        NSLog(@"Parse normals, floats %d", count);
     }
     
     source = [TBXML nextSiblingNamed:@"source" searchFromElement:source];
@@ -98,9 +95,11 @@
     TBXMLElement *p = [TBXML childElementNamed:@"p" parentElement:source];
     NSString *vertices_and_normals_indexes = [TBXML textForElement:p];
     
-    TBXMLElement *first_node = [self traverseToChild:@[@"library_visual_scenes", @"visual_scene", @"node"] fromParent:root];
+    
+    //WARNING, doesn't fetch transform
+//    TBXMLElement *first_node = [self traverseToChild:@[@"library_visual_scenes", @"visual_scene", @"node"] fromParent:root];
     NSString *transform_matrix = @"";//[self getGeometryTransform:first_node];
-    NSLog(@"transform: %@", transform_matrix);
+//    NSLog(@"transform: %@", transform_matrix);
     return @[vertex_string, normals_string, vertices_and_normals_indexes, transform_matrix, tex_string];
 }
 
@@ -175,14 +174,14 @@
 
     NSMutableArray *skeleton_array = [[NSMutableArray alloc] init];
     [self parseSkeletonNode:skeleton_node level:0 array:skeleton_array parent:@""];
-    
-    int level = 0;
-    for(NSArray * a in skeleton_array){
-        for(NSDictionary *d in a){
-            NSLog(@"Name:%d %@", level, d[@"name"]);
-        }
-        level++;
-    }
+//    
+//    int level = 0;
+//    for(NSArray * a in skeleton_array){
+//        for(NSDictionary *d in a){
+//            NSLog(@"Name:%d %@", level, d[@"name"]);
+//        }
+//        level++;
+//    }
     
     return skeleton_array;
 }

@@ -15,11 +15,17 @@ class RenderingObject : SkeletonDelegate{
     var hitboxUniformBuffer : MTLBuffer?
     var skeleton : Skeleton?        {   didSet{  skeleton?.delegate = self  }    }
     var skeletonBuffer : MTLBuffer?
-    
+    var textureName : String
     let mesh_key : String
     
-    init(mesh_key mk : String){
+    init(mesh_key mk : String, textureName tn : String){
         mesh_key = mk
+        textureName = tn
+        let mesh = Graphics.shared.addModel(mesh_key)
+        self.skeleton = mesh.skeleton
+        self.skeletonBuffer = mesh.skeletonBuffer
+        self.skeleton?.delegate = self
+        TextureHandler.shared.getTexture(tn)
     }
     
     func resetPosition(hitbox : Box){
@@ -77,6 +83,17 @@ class RenderingObject : SkeletonDelegate{
     func scale(scale : Float){
         let mat = float4x4(diagonal: float4(scale, scale, scale, 1))
         self.transform = mat * self.transform
+    }
+    
+    func scaleXInPlaye(scale : Float){
+        var translation1 = Matrix.Identity()
+        translation1[3] = -transform[3]
+        translation1[3][3] = 1
+        var translation2 = Matrix.Identity()
+        translation2[3] = transform[3]
+        
+        let scale_mat = float4x4(diagonal: float4(scale, 1, 1, 1))
+        self.transform = translation2 * scale_mat * translation1 * self.transform
     }
     func skeletonDidChangeAnimation(skeleton : Skeleton) {
         let skeleton_matrices = skeleton.getSkeletonData()

@@ -22,6 +22,11 @@ class MetalView : UIView {
         return CAMetalLayer.self
     }
     
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        print("Init metal view")
+        metalLayer = self.layer as? CAMetalLayer
+    }
     required init?(coder aDecoder: NSCoder) {
         super.init(coder: aDecoder)
         print("Init metal view")

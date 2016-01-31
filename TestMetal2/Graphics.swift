@@ -11,7 +11,7 @@ import Metal
 import MetalKit
 
 class Graphics {
-    
+    static let shared = Graphics()
     var renderer    = Renderer()
     var meshes      = [String : Mesh]()
     let camera      = Camera()
@@ -23,9 +23,9 @@ class Graphics {
     
     func start(layer : CAMetalLayer){
         camera.setFrustum((Float(layer.bounds.width)/2)/Settings.zoomFactor, top: (Float(layer.bounds.height)/2)/Settings.zoomFactor)
+        camera.aspect = Float(layer.frame.width / layer.frame.height)
         renderer.metalLayer = layer
         renderer.initilize()
-        camera.aspect = Float(layer.frame.width / layer.frame.height)
         
         if Settings.drawHitBox {
             updateHitboxBuffer()
@@ -55,28 +55,30 @@ class Graphics {
         return mesh!
     }
     
-    func redraw(models : [Model]){
-        
-        self.renderer.startFrame()
-        for m in models {
-            
-            if m.renderingObject != nil {
-                let mesh = meshes[m.renderingObject!.mesh_key]
-                updateUniforms(&m.uniformBuffer, transform: m.renderingObject!.transform)
-                self.renderer.drawMesh(mesh!, uniformBuffer: m.uniformBuffer!)
+    func redraw(models : [Object]){
+        autoreleasepool {
+            if !self.renderer.startFrame() {
+                return
+            }
+            for m in models {
                 
-                if Settings.drawHitBox {
-                    drawHitBox(m)
+                if m.renderingObject != nil {
+                    let mesh = meshes[m.renderingObject!.mesh_key]
+                    updateUniforms(&m.uniformBuffer, transform: m.renderingObject!.transform)
+                    let texture = TextureHandler.shared[m.renderingObject?.textureName]
+                    self.renderer.drawMesh(mesh!, uniformBuffer: m.uniformBuffer!, texture: texture)
+                    
+                    if Settings.drawHitBox {
+                        drawHitBox(m)
+                    }
                 }
             }
+            
+            self.renderer.endFrame()
         }
-        
-        self.renderer.endFrame()
     }
     
-    
-    
-    func drawHitBox(m : Model){
+    func drawHitBox(m : Object){
         var hb_trans = Matrix.Identity()
         hb_trans[0].x = m.hitbox!.width
         hb_trans[1].y = m.hitbox!.height

@@ -9,7 +9,7 @@
 import UIKit
 import simd
 class LevelEditorViewController: UIViewController {
-    let graphics    = Graphics()
+    let graphics    = Graphics.shared
     var displayLink : CADisplayLink?
     var grid : GridMesh?
     
@@ -24,11 +24,12 @@ class LevelEditorViewController: UIViewController {
         presser.minimumPressDuration = 0.0
         self.view.addGestureRecognizer(presser)
         
+        #if TARGET_OS_IOS
         let panner = UIPanGestureRecognizer(target: self, action: Selector("panned:"))
         panner.minimumNumberOfTouches = 2
         panner.maximumNumberOfTouches = 2
         self.view.addGestureRecognizer(panner)
-        
+        #endif
     }
     
     override func viewDidAppear(animated: Bool) {

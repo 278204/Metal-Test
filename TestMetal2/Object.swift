@@ -12,17 +12,18 @@ import simd
 class Object{
     var position : float3 = float3(0,0,0)   {didSet{    positionDidSet()    }}
     var hitbox  : Box?
-    var rect : CGRect = CGRectZero
-    
+    var rect : AABB = AABB(rect: CGRectZero)
     var uniformBuffer : MTLBuffer?
     let renderingObject : RenderingObject?
     var dynamic : Bool
     var can_rest = false
-    var collision_bit : UInt8 = 0b1111
+    var collision_bit : UInt8 = 0b0000
     
-    init(name : String, renderingObject ro : RenderingObject?){
+    init(name : String, texture : String){
         dynamic = false
-        renderingObject = ro
+        renderingObject = RenderingObject(mesh_key: name, textureName: texture)
+        self.hitbox = Graphics.shared.meshes[name]?.hitbox
+        self.resetToOrigin()
     }
     
     func positionDidSet(){
@@ -54,19 +55,15 @@ class Object{
     }
     
     func moveBy(offset : float3) {
-        
+//        print("move by \(offset)")
         renderingObject?.translate(offset)
         
         var pos = position
-        pos.x += offset.x
-        pos.y += offset.y
-        pos.z += offset.z
+        pos += offset
         position = pos
 
-        
         hitbox?.origin += offset
-        self.rect.origin.x += CGFloat(offset.x)
-        self.rect.origin.y += CGFloat(offset.y)
+        self.rect.origin += offset.xy
     }
     
     func moveTo(pos : float3){
@@ -75,16 +72,15 @@ class Object{
         
         position = pos
         hitbox?.origin.x = pos.x - hitbox!.width/2
-        hitbox?.origin.y = pos.y - hitbox!.height/2
-        rect.origin.x = CGFloat(hitbox!.origin.x)
-        rect.origin.y = CGFloat(hitbox!.origin.y)
+        hitbox?.origin.y = pos.y - hitbox!.height
+        rect.origin.x = hitbox!.origin.x
+        rect.origin.y = hitbox!.origin.y
     }
     
     func didUpdateHitbox(){
-        self.rect.origin.x = CGFloat(hitbox!.origin.x)
-        self.rect.origin.y = CGFloat(hitbox!.origin.y)
-        self.rect.size.width = CGFloat(hitbox!.width)
-        self.rect.size.height = CGFloat(hitbox!.height)
+        self.rect.origin = hitbox!.origin.xy
+        self.rect.width = hitbox!.width
+        self.rect.height = hitbox!.height
     }
     
     func resetToOrigin(){
@@ -96,9 +92,64 @@ class Object{
         
         renderingObject?.resetPosition(hitbox!)
         
-        rect.origin.x = CGFloat(hitbox!.origin.x)
-        rect.origin.y = CGFloat(hitbox!.origin.y)
-        rect.size.width = CGFloat(hitbox!.width)
-        rect.size.height = CGFloat(hitbox!.height)
+        rect.origin = hitbox!.origin.xy
+        rect.width = hitbox!.width
+        rect.height = hitbox!.height
+    }
+    
+    func checkCollision(inout md_ret : (penetration_vector : float2, side : Direction), bits : UInt8) {
+        var reset = false
+        switch(md_ret.1){
+        case .Top:
+            if bits & 0b1000 != 0 {
+                reset = true
+            }
+        case .Right:
+            if bits & 0b0100 != 0 {
+                reset = true
+            }
+        case .Left:
+            if bits & 0b0001 != 0 {
+                reset = true
+            }
+        case .Bottom:
+            if bits & 0b0010 != 0 {
+                reset = true
+            }
+        case .None:
+            md_ret.0 = float2(0,0)
+        }
+        if reset {
+            md_ret.1 = .None
+            md_ret.0 = float2(0,0)
+        }
+    }
+    
+    func checkCollision(inout md_ret : (h : Float, side : Direction), bits : UInt8) {
+        var reset = false
+        switch(md_ret.side){
+        case .Top:
+            if bits & 0b1000 != 0 {
+                reset = true
+            }
+        case .Right:
+            if bits & 0b0100 != 0 {
+                reset = true
+            }
+        case .Left:
+            if bits & 0b0001 != 0 {
+                reset = true
+            }
+        case .Bottom:
+            if bits & 0b0010 != 0 {
+                reset = true
+            }
+        case .None:
+            md_ret.0 = Float.infinity
+        }
+        if reset {
+            md_ret.1 = .None
+            md_ret.0 = Float.infinity
+        }
     }
 }

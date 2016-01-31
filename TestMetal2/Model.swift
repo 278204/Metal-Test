@@ -11,20 +11,50 @@ import Metal
 import simd
 import UIKit
 
-
-
 enum VelocityState {
     case None
     case Accelerating
     case Decelerating
 }
 
-enum ModelState {
-    case Unknown
-    case OnGround
-    case Jumping
-    case Falling
-    case WallSliding
+class ModelContactState {
+    var bitmask = UInt8(0)
+    
+    func setOnLeftWall(){
+        bitmask |= 0b0001
+    }
+    func setOnRightWall(){
+        bitmask |= 0b0100
+    }
+    func setOnGround(){
+        bitmask |= 0b0010
+    }
+    func setOnRoof(){
+        bitmask |= 0b1000
+    }
+    
+    func onGround() -> Bool{
+        return check_bit(1)
+    }
+    func onWall() -> Bool {
+        return onWallToLeft() || onWallToRight()
+    }
+    func onWallToRight() -> Bool {
+        return check_bit(2)
+    }
+    func onWallToLeft() -> Bool {
+        return check_bit(0)
+    }
+    func onRoof() -> Bool {
+        return check_bit(3)
+    }
+    
+    func check_bit(pos : UInt8) -> Bool{
+        return bitmask & (1<<pos) != 0
+    }
+    func reset(){
+        bitmask = 0
+    }
 }
 
 enum AnimationType {
@@ -33,7 +63,7 @@ enum AnimationType {
     case Running
     case Jumping
     case WallGliding
-    
+    case Falling
     static func stringToState(s : String)->AnimationType{
         switch(s){
         case "resting":
@@ -44,6 +74,8 @@ enum AnimationType {
             return .Running
         case "jump":
             return .Jumping
+        case "fall":
+            return .Falling
         default:
             return .Unknown
         }
@@ -51,15 +83,33 @@ enum AnimationType {
 }
 
 enum Direction {
+    case None
     case Right
     case Left
     case Top
     case Bottom
+    
+    mutating func opposite(){
+        switch(self){
+        case .Right:
+            self = .Left
+        case .Left:
+            self = .Right
+        case .Top:
+            self = .Bottom
+        case .Bottom:
+            self = .Top
+        default:
+            break
+        }
+    }
 }
 
 protocol ModelDelegate{
     func modelDidChangePosition(model : Model)
+    func modelDidDie(model : Model)
 }
+
 
 class ModelConst {
     static let friction     : Float  = 0.96
@@ -71,168 +121,98 @@ class ModelConst {
     static let walljump     : float2 = float2(20, 40)
 }
 
+
 class Model : Object{
     
     var delegate : ModelDelegate?
-    var current_rect = CGRectZero
+    var current_rect = AABB(rect: CGRectZero) {didSet{
+            assertionFailure()
+        }}
     var velocity : float2 = float2(0,0)
     var acceleration = float2(0,0)
     var mass = 15.0
     var direction = Direction.Right
-    var state = ModelState.Unknown
+    var contactState = ModelContactState()
     var horizontal_state = VelocityState.None
     var animation_state : AnimationType { get { return getAnimationState() }}
-    var onWall      : Bool  { get{ return state == .WallSliding                 }}
-    var onGround    : Bool  { get{ return state == .OnGround                    }}
-    var isRunning   : Bool  { get{ return horizontal_state == .Accelerating     }}
+    
+    var onGround    : Bool  { get{ return contactState.onGround() }}
+    var isRunning   : Bool  { get{ return horizontal_state == .Accelerating  || horizontal_state == .Decelerating   }}
     
     
-    override init(name : String, renderingObject ro : RenderingObject?){
-        super.init(name: name, renderingObject: ro)
+    override init(name : String, texture : String){
+        super.init(name: name, texture: texture)
         dynamic = true
     }
     
-    func update(dt : Float){
-        if dynamic {
-            handleAnimations(dt)
-            
-            if !onGround {
-                let wall_fric = onWall && velocity.y < 0 ? 0.1 : 1.0
-                let gravity_delta = dt * Float(Settings.gravity * mass * wall_fric)
-                velocity.y += Float(gravity_delta)
-            }
-            
-            if !isRunning{
-                if abs(velocity.x) >= ModelConst.friction {
-                    velocity.x -= ModelConst.friction * Float(Math.sign(velocity.x))
-                } else {
-                    velocity.x = 0
-                }
-            } else {
-            
-                //Accelerate or decelerate depending on direction
-                if Math.sign(acceleration.x) == Math.sign(velocity.x) {
-                    velocity += acceleration * dt
-                } else {
-                    velocity.x += -Float(Math.sign(velocity.x)) * ModelConst.deceleration * dt
-                }
-                
-                //TopSpeed
-                if abs(velocity.x) > ModelConst.topSpeed {
-                    if velocity.x < 0 {
-                        velocity.x = -ModelConst.topSpeed
-                    } else{
-                        velocity.x = ModelConst.topSpeed
-                    }
-                }
-            }
-            
-            try_moveBy(float3(velocity.x * dt, velocity.y * dt, 0))
-            
+    func update(dt : Float, currentTime : Float){
+        if self.position.y < -1 {
+            self.died()
         }
     }
     
     func try_moveBy(offset : float3) {
-        self.rect.origin.x += CGFloat(offset.x)
-        self.rect.origin.y += CGFloat(offset.y)
-        state = .Unknown
+        self.rect.origin += offset.xy
+        contactState.reset()
     }
     
     func updateToNextRect(){
-        //        var pos = float3(0,0,0)
         let offset = self.rect.origin - self.current_rect.origin
-        //        pos.x = Float(self.rect.origin.x + self.rect.width/2)
-        //        pos.y = Float(self.rect.origin.y + self.rect.height/2)
-        //
-        //        super.moveTo(pos)
+        self.rect.origin = self.current_rect.origin
+        moveBy(offset.xyz)
         
-        self.rect = self.current_rect
-        
-        moveBy(float3(Float(offset.x), Float(offset.y), 0))
-        
-        if state == .Unknown {
-            if velocity.y > 0 {
-                state = .Jumping
-            } else if velocity.y < 0{
-                state = .Falling
-            } else {
-                print("WARNING, still unknown state")
-            }
-        } else if state == .OnGround {
-            if velocity.x == 0 {
+        if onGround {
+            if velocity.x == 0 && horizontal_state == .Decelerating{
                 horizontal_state = .None
             }
         }
-        
-        if direction == .Right && acceleration.x < 0 && !onWall{
-            flipDirection()
-        } else if direction == .Left && acceleration.x > 0 && !onWall{
-            flipDirection()
+    }
+    
+    func changeAcceleration(a : Float){
+        acceleration.x = a
+        if a == 0 {
+            horizontal_state = .Decelerating
+        } else {
+            horizontal_state = .Accelerating
         }
     }
     
-    
     func handleAnimations(dt : Float) {
         var anim_dt = dt
-
         renderingObject?.skeleton?.changeAnimation(animation_state)
+        
         if animation_state == .Running {
             renderingObject?.skeleton?.animationHandler.loop = true
             anim_dt = dt * abs(velocity.x)/10
-        } else if state == .Jumping{
-            renderingObject?.skeleton?.animationHandler.loop = false
         }
-        
+    
         renderingObject?.update(anim_dt)
-        
     }
     
     func getAnimationState() -> AnimationType {
         if onGround && horizontal_state == .None{
             return .Resting
-        } else if onGround && horizontal_state != .None {
+        } else if onGround && isRunning {
             return .Running
-        } else if state == .WallSliding && !onGround{
-            return .WallGliding
         } else if !onGround {
-            return .Jumping
+            if velocity.y > 0 {
+                return .Jumping
+            } else {
+                return .Falling
+            }
         }
         return .Unknown
     }
     
-    func runRight(){
-        
-        horizontal_state = .Accelerating
-        acceleration.x = ModelConst.acc
-    }
-    func runLeft(){
-        
-        horizontal_state = .Accelerating
-        acceleration.x = -ModelConst.acc
-    }
-    func stop(){
-        acceleration.x = 0
-        horizontal_state = .Decelerating
-    }
     
-    func jumpStart(){
-        
-        if onGround{
-            velocity.y = ModelConst.jump
-        } else if onWall {
-            velocity.x = ModelConst.walljump.x
-            velocity.y = ModelConst.walljump.y
+    func setDirection(dir : Direction){
+        if dir != direction {
+            self.renderingObject?.rotateYInPlace(180)
         }
-        state = .Jumping
+        direction = dir
     }
-    
-    func jumpEnd(){
-        if state == .Jumping && velocity.y > ModelConst.jump_short {
-            velocity.y = ModelConst.jump_short
-        }
-    }
-    
     func flipDirection(){
+        print("Flip Direction")
         self.renderingObject?.rotateYInPlace(180)
         if direction == .Left {
             direction = .Right
@@ -243,68 +223,116 @@ class Model : Object{
 
     override func moveTo(pos : float3){
         super.moveTo(pos)
-        current_rect = self.rect
+        self.current_rect.origin = self.rect.origin
     }
-    
-    
+
     override func moveBy(offset : float3) {
         super.moveBy(offset)
-        current_rect = self.rect
+        self.current_rect.origin = self.rect.origin
     }
-    
-
-
-
     
     override func didUpdateHitbox(){
         super.didUpdateHitbox()
-        current_rect = self.rect
+        self.current_rect.origin = self.rect.origin
     }
-
     
     override func positionDidSet(){
         self.delegate?.modelDidChangePosition(self)
     }
     
-    func handleIntersectWithRect(o : Object){
-        
-        let this_aabb = AABB(rect: self.rect)
-        let other_aabb = AABB(rect: o.rect)
-        
-        let md = other_aabb.minkowskiDifference(this_aabb)
-        
-        if md.origin.x <= 0 && md.get_max().x >= 0 &&
-            md.origin.y <= 0 && md.get_max().y >= 0 {
-                
-                let md_ret = md.closestPointOnBoundsToOrigin(o.collision_bit)
-                var penetration_vector = md_ret.0
-                
-                
-                switch(md_ret.1){
-                case .Top:
-                    velocity.y = 0
-                    state = .OnGround
-                case .Right:
-                    if state != .OnGround {
-                        state = .WallSliding
-                    }
-//                    velocity.x *= 0
-//                    penetration_vector.x *= 0.4
-                case .Left:
-                    if state != .OnGround {
-                        state = .WallSliding
-                    }
-//                    velocity.x *= 0
-//                    penetration_vector.x *= 0.4
-                default:
-                    break
-                }
-                
-                self.rect.origin = self.rect.origin + CGPoint(x: CGFloat(penetration_vector.x), y: CGFloat(penetration_vector.y))
-        }
-        return
-
+    func died(){
+        self.delegate?.modelDidDie(self)
     }
     
+    func handleIntersectWithObject(o : Object, side : Direction){
+        switch(side){
+        case .Top:
+            velocity.y = 0
+            contactState.setOnGround()
+        case .Right:
+            velocity.x = 0
+        case .Left:
+            velocity.x = 0
+        case .Bottom:
+            velocity.y = 0
+        case .None:
+            break
+        }
+        
+    }
 
+    func checkIntersectWithRect(o : Object, dt : Float){
+        var md = o.rect.minkowskiDifference(self.rect)
+        var handled = false
+        if md.isAtOrigo() {
+            var md_ret = md.closestPointOnBoundsToOrigin()
+            checkCollision(&md_ret, bits: o.collision_bit)
+            if md_ret.side != .None {
+                handled = true
+                handleIntersectWithObject(o, side: md_ret.side)
+                if !(o is Model) {
+                    self.rect.origin = self.rect.origin + md_ret.penetration_vector
+                }
+            }
+        }
+        
+        if !handled {
+            md = o.rect.minkowskiDifference(self.current_rect)
+            var relativeMotion = self.velocity * dt
+            if o is Model {
+                let m = o as! Model
+                relativeMotion = (self.velocity - m.velocity) * dt
+            }
+            
+            var md_ret = md.getRayIntersectionFraction(float2(0,0), directionA: relativeMotion)
+            
+            //WARNING, cant check for epsilon?
+            if md_ret.h < Float.infinity && md_ret.h > 0.000001{
+                
+                checkCollision(&md_ret, bits: o.collision_bit)
+//                collisionsAgaintsVelocity(&md_ret)
+                
+                if md_ret.side != .None {
+                    let h = md_ret.h
+                    if md_ret.side == .Left || md_ret.side == .Right {
+                        self.rect.origin.x = self.current_rect.origin.x + (self.velocity.x * dt * h)
+                    } else {
+                        self.rect.origin.y = self.current_rect.origin.y + (self.velocity.y * dt * h)
+                    }
+                    
+                    if o is Model {
+                        let m = o as! Model
+                        m.rect.origin = m.current_rect.origin + (m.velocity * dt * h)
+                    }
+                    handleIntersectWithObject(o, side: md_ret.side)
+                }
+            }
+        }
+    }
+//    func collisionsAgaintsVelocity(inout md_ret : (Float, Direction)){
+//        var reset = false
+//        switch(md_ret.1){
+//        case .Top:
+//            if velocity.y > 0 {
+//                reset = true
+//            }
+//        case .Right:
+//            if velocity.x > 0 {
+//                reset = true
+//            }
+//        case .Left:
+//            if velocity.x < 0 {
+//                reset = true
+//            }
+//        case .Bottom:
+//            if velocity.y < 0 {
+//                reset = true
+//            }
+//        case .None:
+//            md_ret.0 = Float.infinity
+//        }
+//        if reset {
+//            md_ret.0 = 0
+//        }
+//    }
 }

@@ -102,11 +102,6 @@ class QuatTrans {
         q[3] = translate
         q[0][3] = 0
         return q
-//        var mat_t = Matrix.Identity()
-//        mat_t[3] = translate
-//        
-//        
-//        return mat_t * q
     }
 }
 
@@ -127,13 +122,13 @@ class Quaternion {
         var qz : Float = 0;
         var S : Float = 0;
         
-        if( (mat[0][0] + mat[1][1] + mat[2][2]) > 0 ) {
-            S = 0.5 * sqrtf(mat[0][0] + mat[1][1] + mat[2][2] + 1)
-            qw = S;
-            qx = ( mat[2][1] - mat[1][2]) / (S * 4)
-            qy = ( mat[0][2] - mat[2][0] ) / (S * 4)
-            qz = ( mat[1][0] - mat[0][1] ) / (S * 4)
-        } else{
+//        if( (mat[0][0] + mat[1][1] + mat[2][2]) > 0 ) {
+//            S = 0.5 * sqrtf(mat[0][0] + mat[1][1] + mat[2][2] + 1)
+//            qw = S;
+//            qx = ( mat[2][1] - mat[1][2]) / (S * 4)
+//            qy = ( mat[0][2] - mat[2][0] ) / (S * 4)
+//            qz = ( mat[1][0] - mat[0][1] ) / (S * 4)
+//        } else{
             if mat[0][0] > mat[1][1] && mat[0][0] > mat[2][2] {
                 if (( 1.0 + mat[0][0] - mat[1][1] - mat[2][2] ) <= 0) {
                     print("ERROR")
@@ -166,7 +161,7 @@ class Quaternion {
                 qy = (mat[1][2] + mat[2][1]) / S; 
                 qz = 0.25 * S;
             }
-        }
+//        }
         return float4(qx, qy, qz, qw)
     }
     
@@ -184,57 +179,14 @@ class Quaternion {
         mat2[3] = float4(-q.x, -q.y, -q.z, q.w)
         
         return mat1 * mat2
-        
-//        mat1[0][0] = 1 - 2 * q.y * q.y - 2 * q.z * q.z
-//        mat1[0][1] = 2 * q.x * q.y - 2 * q.z * q.w
-//        mat1[0][2] = 2 * q.x * q.z + 2 * q.y * q.w
-//        
-//        mat1[1][0] = 2 * q.x * q.y + 2 * q.z * q.w
-//        mat1[1][1] = 1 - 2 * q.x * q.x - 2 * q.z * q.z
-//        mat1[1][2] = 2 * q.y * q.z - 2 * q.x * q.w
-//        
-//        mat1[2][0] = 2 * q.x * q.z - 2 * q.y * q.w
-//        mat1[2][1] = 2 * q.y * q.z + 2 * q.x * q.w
-//        mat1[2][2] = 1 - 2 * q.x * q.x - 2 * q.y * q.y
-//        
-//        return mat1
-//
-//        let sqw = q.w * q.w
-//        let sqx = q.x * q.x
-//        let sqy = q.y * q.y
-//        let sqz = q.z * q.z
-//        
-//        let inv = 1 / (sqx + sqy + sqz + sqw)
-//        
-//        mat1[0][0] = ( sqx - sqy - sqz + sqw) * inv
-//        mat1[1][1] = (-sqx + sqy - sqz + sqw) * inv
-//        mat1[2][2] = (-sqx - sqy + sqz + sqw) * inv
-//        
-//        var tmp1 = q.x * q.y
-//        var tmp2 = q.z * q.w
-//        mat1[1][0] = 2.0 * (tmp1 + tmp2) * inv
-//        mat1[0][1] = 2.0 * (tmp1 - tmp2) * inv
-//        
-//        tmp1 = q.x * q.z
-//        tmp2 = q.y * q.w
-//        mat1[2][0] = 2.0 * (tmp1 - tmp2) * inv
-//        mat1[0][2] = 2.0 * (tmp1 + tmp2) * inv
-//        
-//        tmp1 = q.y * q.z
-//        tmp2 = q.x * q.w
-//        mat1[2][1] = 2.0 * (tmp1 + tmp2) * inv
-//        mat1[1][2] = 2.0 * (tmp1 - tmp2) * inv
-//        
-//        return mat1
-        
     }
     
     class func slerp(t : Float, q1 : float4, var q2 : float4) -> float4{
         
         var cos_theta_div2 = q1.w * q2.w + q1.x * q2.x + q1.y * q2.y + q1.z * q2.z
 
-////        //WARNING, unneccessary?
-        if cos_theta_div2 < 0.0 {
+        //WARNING, unneccessary?
+        if cos_theta_div2 < 0.0{
             q2.w = -q2.w; q2.x = -q2.x; q2.y = -q2.y; q2.z = q2.z;
             cos_theta_div2 = -cos_theta_div2
         }
@@ -312,18 +264,35 @@ func * (left:float2, right : Float) -> float2 {
     return l
 }
 
+
+extension float2 {
+    var xyz : float3 {get{return float3(x,y, 0)}}
+    
+    func cross(d : float2) -> Float{
+        return (x * d.y) - (y * d.x)
+    }
+    func normalize() -> float2{
+        let len = length()
+        return float2(x / len, y / len)
+    }
+    func length() -> Float{
+        return sqrtf(x*x + y*y)
+    }
+}
+
 extension float3{
+    var xy : float2 {get{return float2(x,y)}}
     func length() -> Float{
         return sqrtf(x*x + y*y + z*z)
     }
+    
+    
 }
 extension float4 {
     func xyz()->float3 {
         return float3(x, y, z)
     }
 }
-
-
 extension float4x4 {
     func printOut(){
         print("Matrix:")

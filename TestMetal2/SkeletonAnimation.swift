@@ -17,6 +17,11 @@ class JointTransform {
         quaternion = QuatTrans.convertMatrixToQuaternion(tfs)
         translate = QuatTrans.convertMatrixToTranslation(tfs)
     }
+    
+    init(quaternion qt  :float4, translate ts : float4){
+        quaternion = qt
+        translate = ts
+    }
 }
 
 class FrameAnimation {
@@ -61,6 +66,7 @@ class JointFrames{
 
 class AnimationsHandler {
     var animationsForType = [AnimationType : FrameAnimation]()
+    var last_animations = [JointTransform?]()
     var type : (current : AnimationType, next : AnimationType) = (.Unknown, .Unknown)
     var frames : (current : Frame, next : Frame)
     var current_time : Float
@@ -75,11 +81,13 @@ class AnimationsHandler {
         get {
             return animationsForType[index]
         } set(newValue) {
+            
             let firstValue = animationsForType.count == 0
             animationsForType[index] = newValue
             if firstValue{
                 changeAnimation(index)
             }
+            last_animations = [JointTransform?](count: animationsForType[index]!.frames.first!.joints.count, repeatedValue: nil)
         }
     }
     
@@ -89,25 +97,43 @@ class AnimationsHandler {
     func isLast(frame : Frame, forType t : AnimationType)->Bool {
         return frame.index >= self[t]!.frames.count-1
     }
+    func isTransitioning() -> Bool {
+        return type.current != type.next
+    }
     
     func update(dt : Float) {
         
         current_time += dt
-        if current_time > frames.next.time && !isStatic(type.current) {
-            if isLast(frames.next, forType: type.current) {
+        
+        if isTransitioning() {
+            if current_time > frames.next.time {
                 if loop {
                     self.reset()
                 } else {
                     return
                 }
-            } else {
-                frames.current = frames.next
-                frames.next = self[type.current]!.frames[frames.current.index+1]
+            }
+        } else {
+            if current_time > frames.next.time && !isStatic(type.current) {
+                if isLast(frames.next, forType: type.current) {
+                    if loop {
+                        self.reset()
+                    } else {
+                        return
+                    }
+                } else {
+                    frames.current = frames.next
+                    frames.next = self[type.current]!.frames[frames.current.index+1]
+                }
             }
         }
     }
     
     func getT()->Float {
+        if isTransitioning() {
+            let t = (current_time) / frames.next.time
+            return t
+        }
         let t : Float = frames.current.index == frames.next.index ?
                         1 :
                         (current_time - frames.current.time) /
@@ -117,23 +143,34 @@ class AnimationsHandler {
     
     
     func getInterpolatedMatrix(t : Float, jointIndex j : Int) -> float4x4{
+        
         let q_t = QuatTrans()
         q_t.quaternion = getInterpolatedQuaternion(t, jointIndex: j)
         q_t.translate = getInterpolatedTranslate(t, jointIndex: j)
         
+        let jt = JointTransform(quaternion: q_t.quaternion, translate: q_t.translate)
+        last_animations[j] = jt
         return q_t.convertToMatrix()
     }
     
     func getInterpolatedQuaternion(t : Float, jointIndex j : Int)->float4{
-        let quat1 = frames.current.joints[j].quaternion
+        var quat1 = frames.current.joints[j].quaternion
         let quat2 = frames.next.joints[j].quaternion
+        
+        if isTransitioning() && last_animations[j] != nil{
+            quat1 = last_animations[j]!.quaternion
+        }
         
         return Quaternion.slerp(t, q1: quat1, q2: quat2)
     }
     
     func getInterpolatedTranslate(t : Float, jointIndex j : Int)->float4 {
-        let trans1 = frames.current.joints[j].translate
+        var trans1 = frames.current.joints[j].translate
         let trans2 = frames.next.joints[j].translate
+        
+        if isTransitioning() && last_animations[j] != nil{
+            trans1 = last_animations[j]!.translate
+        }
         
         return t * trans2 + (1 - t) * trans1
     }
@@ -145,14 +182,15 @@ class AnimationsHandler {
         }
         
         if nxt != type.next {
+//            print("new animation type \(nxt)")
             type.next = nxt
-            type.current = type.next
-            
-            reset()
+            frames.next = self[nxt]!.frames.first!
+            current_time = 0
         }
     }
     
     func reset(){
+        type.current = type.next
         frames.current = self[type.current]!.frames.first!
         frames.next = !isStatic(type.current) ? self[type.current]!.frames[1] : frames.current
         current_time = frames.current.time

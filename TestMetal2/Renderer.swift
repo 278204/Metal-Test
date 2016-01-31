@@ -12,6 +12,10 @@ import QuartzCore
 import Metal
 import simd
 
+class DeviceSingleton{
+    static let shared = MTLCreateSystemDefaultDevice()
+}
+
 class Renderer {
     
     var vertexFunctionName : String = "" {
@@ -29,7 +33,7 @@ class Renderer {
     
     var metalLayer : CAMetalLayer?
     var commandQueue : MTLCommandQueue?
-    var device : MTLDevice?
+    var device : MTLDevice? {get { return DeviceSingleton.shared }}
     var library : MTLLibrary?
     
     var pipeline : MTLRenderPipelineState?
@@ -39,17 +43,24 @@ class Renderer {
     var commandBuffer : MTLCommandBuffer?
     var drawable : CAMetalDrawable?
     var sampler : MTLSamplerState?
+    
+    //OPTIMIZE, unnecessary?
     var depthTexture : MTLTexture?
     
+    
+    
     func initilize(){
-        device = MTLCreateSystemDefaultDevice()
-        if device == nil {
+        
+        print("Init renderer")
+        if self.device == nil {
             print("ERROR Unable to create default device")
         }
         
+        
         metalLayer?.device = device
         metalLayer?.pixelFormat = MTLPixelFormat.BGRA8Unorm
-
+        metalLayer?.framebufferOnly = true
+        
         library = device?.newDefaultLibrary()
         pipelineIsDirty = true
         
@@ -120,74 +131,37 @@ class Renderer {
         self.commandQueue = self.device?.newCommandQueue()
     }
     
-    
-    
-    func newTexture(textureName : String) -> MTLTexture?{
-        let image = UIImage(named: textureName)
-        if image == nil {
-            print("ERROR creating new material, image couldn't be found \(image)")
-            return nil
-        }
-        return textureForImage(image!)
-    }
-    
-    func textureForImage(image : UIImage) -> MTLTexture{
-        let imageRef = image.CGImage
-        
-        let width = CGImageGetWidth(imageRef)
-        let height = CGImageGetHeight(imageRef)
-        let colorspace = CGColorSpaceCreateDeviceRGB()
-        let rawData = calloc(height * width * 4, sizeof(UInt8));
-        let bytesPerPixel = 4
-        let bytesPerRow = bytesPerPixel * width
-        let bitsPerComponents = 8
-        var bitmapInfo = CGBitmapInfo.ByteOrder32Big.rawValue
-        bitmapInfo |= CGBitmapInfo(rawValue: CGImageAlphaInfo.PremultipliedLast.rawValue).rawValue
-
-        let context = CGBitmapContextCreate(rawData, width, height, bitsPerComponents, bytesPerRow, colorspace, bitmapInfo)
-        
-        CGContextTranslateCTM(context, 0, CGFloat(height))
-        CGContextScaleCTM(context, 1, -1)
-        
-        CGContextDrawImage(context, CGRect(x: 0, y: 0, width: width, height: height), imageRef)
-        
-        let textureDescriptor = MTLTextureDescriptor.texture2DDescriptorWithPixelFormat(MTLPixelFormat.RGBA8Unorm, width: width, height: height, mipmapped: true)
-        
-        let texture = self.device?.newTextureWithDescriptor(textureDescriptor)
-        let region = MTLRegionMake2D(0, 0, width, height)
-        texture?.replaceRegion(region, mipmapLevel: 0, withBytes: rawData, bytesPerRow: bytesPerRow)
-        
-        free(rawData)
-        
-        return texture!
-    }
-    
-    
     func createDepthBuffer(){
-        let drawableSize = self.metalLayer?.drawableSize
-        let depthTexDesc =  MTLTextureDescriptor.texture2DDescriptorWithPixelFormat(MTLPixelFormat.Depth32Float, width: Int(drawableSize!.width), height: Int(drawableSize!.height), mipmapped: false)
+        let drawableSize = self.metalLayer!.drawableSize
+        let depthTexDesc =  MTLTextureDescriptor.texture2DDescriptorWithPixelFormat(MTLPixelFormat.Depth32Float, width: Int(drawableSize.width), height: Int(drawableSize.height), mipmapped: false)
         
         self.depthTexture = self.device?.newTextureWithDescriptor(depthTexDesc)
     }
     
-    func startFrame(){
+    let inflightSemaphore = dispatch_semaphore_create(3)
+    
+    func startFrame() -> Bool{
+        dispatch_semaphore_wait(inflightSemaphore, DISPATCH_TIME_FOREVER)
+        var failure = false
         if self.depthTexture == nil {
             self.createDepthBuffer()
         }
         
-        self.drawable = self.metalLayer?.nextDrawable()
+        self.drawable = self.metalLayer!.nextDrawable()
         let frameBufferTexture = self.drawable?.texture
         
         if frameBufferTexture == nil {
-            print("ERROR, unable to fetch texture, drawable may be nil")
-            return
+            print("ERROR, unable to fetch texture, drawable may be \(self.drawable)")
+            dispatch_semaphore_signal(inflightSemaphore)
+            failure = true
+            return false
         }
         
         if self.pipelineIsDirty {
             self.buildPipeline()
             self.pipelineIsDirty = false
         }
-        
+    
         let renderPass = MTLRenderPassDescriptor()
         renderPass.colorAttachments[0].texture = frameBufferTexture
         renderPass.colorAttachments[0].loadAction = MTLLoadAction.Clear
@@ -206,10 +180,12 @@ class Renderer {
         
         self.commandEncoder?.setFrontFacingWinding(MTLWinding.CounterClockwise)
         self.commandEncoder?.setCullMode(MTLCullMode.Back)
+    
+        return !failure
     }
     
-    func drawMesh(mesh : Mesh, uniformBuffer : MTLBuffer){
-        
+    func drawMesh(mesh : Mesh, uniformBuffer : MTLBuffer, texture : MTLTexture?){
+
         self.commandEncoder?.setVertexBuffer(mesh.vertexBuffer!, offset: 0, atIndex: 0)
         self.commandEncoder?.setVertexBuffer(uniformBuffer, offset: 0, atIndex: 1)
         
@@ -217,7 +193,7 @@ class Renderer {
        
         
         self.commandEncoder?.setFragmentBuffer(uniformBuffer, offset: 0, atIndex: 0)
-        self.commandEncoder?.setFragmentTexture(mesh.texture, atIndex: 0)
+        self.commandEncoder?.setFragmentTexture(texture, atIndex: 0)
         self.commandEncoder?.setFragmentSamplerState(self.sampler, atIndex: 0)
         
         self.commandEncoder?.drawPrimitives(.Triangle, vertexStart: 0, vertexCount: mesh.nr_vertices)
@@ -231,12 +207,18 @@ class Renderer {
     }
     
     func endFrame(){
+
         self.commandEncoder?.endEncoding()
-        
+
         if self.drawable != nil {
             self.commandBuffer?.presentDrawable(self.drawable!)
-            self.commandBuffer?.commit()
+            self.drawable = nil
         }
+        
+        self.commandBuffer?.addCompletedHandler({ buf -> Void in
+            dispatch_semaphore_signal(self.inflightSemaphore)
+        })
+        self.commandBuffer?.commit()
     }
     
     func newBufferWithBytes(bytes : UnsafePointer<Void>, length : Int)->MTLBuffer{

@@ -15,6 +15,7 @@ class Joint {
     var transform : float4x4
     var inv_bind_pose : float4x4
     var temp : float4x4
+    var last_animation : float4x4
     let parent : Joint?
     
     init(name n : String, parent p : Joint?, inverse_bind_pose inv_b_p : float4x4){
@@ -22,6 +23,7 @@ class Joint {
         parent = p
         matrix = Matrix.Identity()
         transform = Matrix.Identity()
+        last_animation = Matrix.Identity()
         inv_bind_pose = inv_b_p
         temp = Matrix.Identity()
     }
@@ -94,18 +96,23 @@ class Skeleton{
     }
     
     func changeAnimation(nxt : AnimationType) {
+        guard animationHandler.animationsForType.count > 0 else {
+            return
+        }
         animationHandler.changeAnimation(nxt)
     }
 
     func runAnimation(dt : Float){
-        
+        guard animationHandler.animationsForType.count > 0 else {
+            return
+        }
         animationHandler.update(dt)
     
         let t : Float = animationHandler.getT()
     
         for j in 0..<animationHandler.frames.current.joints.count {
             let s = joints[j]!
-        
+    
             s.temp = s.parent!.temp * animationHandler.getInterpolatedMatrix(t, jointIndex: j)
             s.matrix = (s.temp * s.inv_bind_pose)
             

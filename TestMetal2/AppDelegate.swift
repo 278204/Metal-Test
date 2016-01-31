@@ -16,6 +16,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(application: UIApplication, didFinishLaunchingWithOptions launchOptions: [NSObject: AnyObject]?) -> Bool {
         // Override point for customization after application launch.
+//        self.window = UIWindow(frame:UIScreen.mainScreen().bounds)
+//        let startVC = GameViewController(rect: window!.bounds)
+//        self.window!.rootViewController = startVC
+//        startVC.viewDidLoad()
+//        self.window!.makeKeyAndVisible()
+
         GamePad.shared
         return true
     }

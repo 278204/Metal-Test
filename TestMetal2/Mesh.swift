@@ -15,7 +15,6 @@ class Mesh{
     var vertexBuffer    : MTLBuffer?
     var indexBuffer     : MTLBuffer?
     var skeletonBuffer  : MTLBuffer?
-    var texture         : MTLTexture?
     var hitbox          : Box?
     var transform       : float4x4?
     var skeleton        : Skeleton
@@ -61,8 +60,6 @@ class Mesh{
                 skeleton.parser?.parseAnimations(animations["animations"] as! [[String : String]], animation_name: s)
             }
         }
-        
-        texture = renderer.newTexture("Texture.png")!
     }
     
     
