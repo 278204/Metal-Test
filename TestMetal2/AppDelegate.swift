@@ -22,6 +22,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 //        startVC.viewDidLoad()
 //        self.window!.makeKeyAndVisible()
 
+        
+//        NSUserDefaults.standardUserDefaults().removePersistentDomainForName(NSBundle.mainBundle().bundleIdentifier!)
         GamePad.shared
         return true
     }

@@ -9,11 +9,7 @@
 import Foundation
 import simd
 
-struct Uniforms{
-    let modelViewProjectionMatrix : float4x4
-    let modelViewMatrix : float4x4
-    let normalMatrix : float3x3
-}
+
 
 
 class Matrix{
@@ -101,6 +97,8 @@ class QuatTrans {
         var q = Quaternion.convertToMatrix(self.quaternion)
         q[3] = translate
         q[0][3] = 0
+        q[1][3] = 0
+        q[2][3] = 0
         return q
     }
 }
@@ -226,8 +224,19 @@ class Math {
         return deg * (Float(M_PI) / 180.0);
     }
     class func sign(v : CGFloat)->Int8{
+        if v == 0 {
+            return 0
+        }
         return v < 0 ? -1 : 1
     }
+    
+    class func signWithZero(v : Float)->Int8{
+        if v == 0 {
+            return 0
+        }
+        return v < 0 ? -1 : 1
+    }
+    
     class func sign(v : Float)->Int8{
         return v < 0 ? -1 : 1
     }
@@ -276,7 +285,10 @@ extension float2 {
         return float2(x / len, y / len)
     }
     func length() -> Float{
-        return sqrtf(x*x + y*y)
+        return sqrtf(lengthSq())
+    }
+    func lengthSq() -> Float {
+        return x*x + y*y
     }
 }
 
@@ -301,5 +313,35 @@ extension float4x4 {
         print("\(self.cmatrix.columns.0.z) \(self.cmatrix.columns.1.z) \(self.cmatrix.columns.2.z) \(self.cmatrix.columns.3.z)")
         print("\(self.cmatrix.columns.0.w) \(self.cmatrix.columns.1.w) \(self.cmatrix.columns.2.w) \(self.cmatrix.columns.3.w)")
         print("")
+    }
+}
+
+extension MTLTexture {
+    
+    func bytes() -> UnsafeMutablePointer<Void> {
+        let width = self.width
+        let height   = self.height
+        let rowBytes = self.width * 4
+        let p = malloc(width * height * 4)
+        
+        self.getBytes(p, bytesPerRow: rowBytes, fromRegion: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0)
+        
+        return p
+    }
+    
+    func toImage() -> CGImage? {
+        let p = bytes()
+        
+        let pColorSpace = CGColorSpaceCreateDeviceRGB()
+        
+        let rawBitmapInfo = CGImageAlphaInfo.NoneSkipFirst.rawValue | CGBitmapInfo.ByteOrder32Little.rawValue
+        let bitmapInfo:CGBitmapInfo = CGBitmapInfo(rawValue: rawBitmapInfo)
+        
+        let selftureSize = self.width * self.height * 4
+        let rowBytes = self.width * 4
+        let provider = CGDataProviderCreateWithData(nil, p, selftureSize, nil)
+        let cgImageRef = CGImageCreate(self.width, self.height, 8, 32, rowBytes, pColorSpace, bitmapInfo, provider, nil, true, CGColorRenderingIntent.RenderingIntentDefault)!
+        
+        return cgImageRef
     }
 }

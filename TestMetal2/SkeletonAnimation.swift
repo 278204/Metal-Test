@@ -9,6 +9,31 @@
 import Foundation
 import simd
 
+enum AnimationType {
+    case Unknown
+    case Resting
+    case Running
+    case Jumping
+    case WallGliding
+    case Falling
+    static func stringToState(s : String)->AnimationType{
+        switch(s){
+        case "resting":
+            return .Resting
+        case "wallSliding":
+            return .WallGliding
+        case "run":
+            return .Running
+        case "jump":
+            return .Jumping
+        case "fall":
+            return .Falling
+        default:
+            return .Unknown
+        }
+    }
+}
+
 class JointTransform {
     let quaternion : float4
     let translate : float4
@@ -71,7 +96,7 @@ class AnimationsHandler {
     var frames : (current : Frame, next : Frame)
     var current_time : Float
     var loop = true
-    
+    var canTransition = false
     init(){
         frames = (Frame(), Frame())
         current_time = 0
@@ -98,7 +123,7 @@ class AnimationsHandler {
         return frame.index >= self[t]!.frames.count-1
     }
     func isTransitioning() -> Bool {
-        return type.current != type.next
+        return type.current != type.next && canTransition
     }
     
     func update(dt : Float) {

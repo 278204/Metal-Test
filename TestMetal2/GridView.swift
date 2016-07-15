@@ -11,6 +11,8 @@ import UIKit
 class GridView: UIScrollView {
 
     let gridColor = UIColor(white: 0.9, alpha: 1.0)
+    var gridSize : CGFloat = 40
+    
     override init(frame : CGRect){
         super.init(frame: frame)
         self.backgroundColor = UIColor.whiteColor()
@@ -40,18 +42,18 @@ class GridView: UIScrollView {
         CGContextDrawLinearGradient(ctx, gradient, startPoint, endPoint, CGGradientDrawingOptions.DrawsAfterEndLocation);
         
         //Create grid
-        let gridSize = Settings.gridSize * 20
+        
 
         let nr_grid_x = Int(rect.width / CGFloat(gridSize))
         let nr_grid_y = Int(rect.height / CGFloat(gridSize))
         
         for i in 0..<nr_grid_x{
-            CGContextMoveToPoint(ctx,       CGFloat(Float(i) * gridSize), rect.height - 0)
-            CGContextAddLineToPoint(ctx,    CGFloat(Float(i) * gridSize), rect.height - (500 * 20))
+            CGContextMoveToPoint(ctx,       CGFloat(i) * gridSize, rect.height - 0)
+            CGContextAddLineToPoint(ctx,    CGFloat(i) * gridSize, rect.height - (500 * 20))
         }
         for i in 0..<nr_grid_y {
-            CGContextMoveToPoint(ctx,       0,  rect.height - CGFloat(Float(i) * gridSize))
-            CGContextAddLineToPoint(ctx,    1000 * 20, rect.height - CGFloat(Float(i) * gridSize))
+            CGContextMoveToPoint(ctx,       0,  rect.height - CGFloat(i) * gridSize)
+            CGContextAddLineToPoint(ctx,    1000 * 20, rect.height - CGFloat(i) * gridSize)
         }
         
         CGContextSetLineWidth(ctx, 1.0)

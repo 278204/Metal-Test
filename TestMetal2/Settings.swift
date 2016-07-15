@@ -14,7 +14,8 @@ class Settings {
     static let gameSpeed : Double = 1.0
     static let gridSize : Float = 2
     static let zoomFactor : Float = 26
-    static let drawHitBox = false
+    static let drawHitBox = true
     static let showRedObjectsInQuad = false
     static let animations = ["LittleBoy" : ["jump", "resting", "wallSliding", "fall"]]
+    static let maxGridPoint = GridPoint(x:100, y:100)
 }

@@ -10,96 +10,121 @@ import Foundation
 import simd
 
 class PlayerConst {
-    static let friction     : Float  = 0.96
-    static let acc          : Float  = 40
+    static let acc_air      : Float  = 60
     static let deceleration : Float  = 90
-    static let topSpeed     : float2 = float2(25, 50)
-    static let jump         : Float  = 50
-    static let jump_short   : Float  = 20
-    static let walljump     : float2 = float2(20, 40)
+    static let deceleration_air : Float  = 90
+    static let jump         : Float  = 41
+    static let jump_short   : Float  = 18
+    static let walljump     : float2 = float2(13, 30)
 }
 
 class Player : Model {
     
+    
     var onWall : Bool  { get{ return contactState.onWall() }}
-    var isWallSliding : Bool { get { return onWall && velocity.y < 0 }}
+    var isWallSliding : Bool { get { return (onWall || isDelayedWallSliding) && velocity.y < 0}}
+    var isDelayedWallSliding : Bool { get {
+        return currentTime - lastWallTime < 0.3 && velocity.y < 0
+    }}
     var lastWallTime : Float = 0
+    var lastWallSide : Direction = Direction.None
     var currentTime : Float = 0
+    
+    var canPickUp = false
+    var wantsJump = false
+    
     init() {
-
-        super.init(name: "LittleBoy", texture: "Texture.png")
+        super.init(name: "LittleBoy", texture: "Texture.png", fragmentType: FragmentType.TextureLight)
         self.rotateX(-90)
         self.rotateY(-90)
-        self.hitbox?.origin.y -= 0.05
+//        self.hitbox?.origin.y -= 0.05
         self.hitbox?.height = Settings.gridSize * 0.9
         self.didUpdateHitbox()
+        self.renderingObject?.setOffset(float4(0, Settings.gridSize * 0.6, 0,1))
+//        self.moveBy(float3(0,Settings.gridSize * 0.6, 1))
+        self.children = [Model]()
+        self.mass = 10
+        
+        self.topSpeed = float2(25, 50)
+        self.acc = float2(30,40)
+        self.collision_type = CollisionBitmask.Player
     }
     
     override func update(dt: Float, currentTime ct : Float) {
-        super.update(dt, currentTime: ct)
         currentTime = ct
         handleAnimations(dt)
-        
         let gravity_delta = dt * Float(Settings.gravity * mass)
+        
         if isWallSliding{
-            velocity.y += Float(gravity_delta) * 0.1
+            velocity.y += Float(gravity_delta) * 0.3
             velocity.y = max(velocity.y, -10)
         } else {
             velocity.y += Float(gravity_delta)
         }
         
         if horizontal_state == .Decelerating{
-            if abs(velocity.x) >= PlayerConst.friction {
-                velocity.x -= PlayerConst.friction * Float(Math.sign(velocity.x))
+            if abs(velocity.x) >= self.friction {
+                velocity.x -= Float(Math.sign(velocity.x)) * self.friction
             } else {
                 velocity.x = 0
             }
-        } else {
+        } else if !dead {
             //Accelerate or decelerate depending on direction
             if Math.sign(acceleration.x) == Math.sign(velocity.x){
-                velocity += acceleration * dt
+                var air_mult : Float = 1.0
+                if !onGround {
+                    air_mult = PlayerConst.acc_air / acc.x
+                }
+                velocity += acceleration * dt * air_mult
             } else {
-                velocity.x += -Float(Math.sign(velocity.x)) * PlayerConst.deceleration * dt
-            }
-            
-            //TopSpeed
-            if abs(velocity.x) > PlayerConst.topSpeed.x {
-                velocity.x = Float(Math.sign(velocity.x)) * min(abs(velocity.x), PlayerConst.topSpeed.x)
-            }
-            if abs(velocity.y) > PlayerConst.topSpeed.y {
-                velocity.y = Float(Math.sign(velocity.y)) * min(abs(velocity.y), PlayerConst.topSpeed.y)
+                var decel = PlayerConst.deceleration
+                if !onGround {
+                    decel = PlayerConst.deceleration_air
+                }
+                velocity.x += -Float(Math.sign(velocity.x)) * decel * dt
             }
         }
         
-        try_moveBy(float3(velocity.x * dt, velocity.y * dt, 0))
+        super.update(dt, currentTime: ct)
     }
     
     func runRight(){
-        changeAcceleration(PlayerConst.acc)
+        changeAcceleration(acc.x)
     }
     
     func runLeft(){
-        changeAcceleration(-PlayerConst.acc)
+        changeAcceleration(-acc.x)
     }
     
     func stop(){
         changeAcceleration(0)
     }
     
+    func jumpOffEnemy(){
+        if wantsJump {
+            jump()
+        } else {
+            jumpShort()
+        }
+    }
+    
     func jumpStart(){
-        
+        wantsJump = true
         if onGround {
-            velocity.y = PlayerConst.jump
+            jump()
         } else{
-            if onWall {
-                if contactState.onWallToRight() {
-                    velocity.x = -PlayerConst.walljump.x
-                } else {
-                    velocity.x = PlayerConst.walljump.x
-                }
-                velocity.y = PlayerConst.walljump.y
-            } else if currentTime - lastWallTime < 0.1 {
-                if acceleration.x < 0 {
+//            if onWall {
+//                if contactState.onWallToRight() {
+//                    velocity.x = -PlayerConst.walljump.x
+//                } else {
+//                    velocity.x = PlayerConst.walljump.x
+//                }
+//                velocity.y = PlayerConst.walljump.y
+//            } else
+            if isDelayedWallSliding {
+                lastWallTime = 0
+                lastWallSide = .None
+                if direction == .Left{
                     velocity.x = -PlayerConst.walljump.x
                 } else {
                     velocity.x = PlayerConst.walljump.x
@@ -109,9 +134,20 @@ class Player : Model {
         }
     }
     
+    func jump(){
+        velocity.y = PlayerConst.jump
+    }
+    func jumpShort(){
+        velocity.y = PlayerConst.jump_short
+    }
+    
     func jumpEnd(){
+        wantsJump = false
+        guard !dead else {
+            return
+        }
         if !contactState.onGround() && velocity.y > PlayerConst.jump_short {
-            velocity.y = PlayerConst.jump_short
+            jumpShort()
         }
     }
     
@@ -119,17 +155,36 @@ class Player : Model {
     
     override func updateToNextRect(){
         super.updateToNextRect()
-        if acceleration.x < 0 && (!onWall || onGround) {
-            setDirection(.Left)
-        } else if acceleration.x > 0 && (!onWall || onGround) {
-            setDirection(.Right)
-        } else if isWallSliding {
-            if contactState.onWallToLeft() {
-                setDirection(.Right)
-            } else if contactState.onWallToRight() {
+        if isDelayedWallSliding {
+            if lastWallSide == .Right {
                 setDirection(.Left)
+            } else if lastWallSide == .Left {
+                setDirection(.Right)
+            }
+        } else if (!onWall || onGround) {
+            if acceleration.x < 0 {
+                setDirection(.Left)
+            } else if acceleration.x > 0{
+                setDirection(.Right)
             }
         }
+//        else if isWallSliding {
+//            if contactState.onWallToLeft() {
+//                setDirection(.Right)
+//            } else if contactState.onWallToRight() {
+//                setDirection(.Left)
+//            }
+//        }
+    }
+    
+    override func handleAnimations(dt : Float) {
+        
+        var anim_dt = dt
+        if animation_state == .Running {
+            anim_dt = dt * abs(velocity.x)/10
+        }
+        super.handleAnimations(anim_dt)
+        
     }
     
     override func getAnimationState() -> AnimationType {
@@ -137,7 +192,7 @@ class Player : Model {
             return .Resting
         } else if onGround && isRunning {
             return .Running
-        } else if isWallSliding{
+        } else if isWallSliding {
             return .WallGliding
         } else if !onGround {
             if velocity.y > 0 {
@@ -149,45 +204,98 @@ class Player : Model {
         return .Unknown
     }
     
-    override func died(){
-        super.died()
+    
+    func pickup(m : Model) {
+        guard m.parent == nil else {
+            return
+        }
+        if m is PickupObject {
+            m.parent = self
+            children!.append(m)
+            flipChildren(direction)
+            print("Did pickup")
+        }
     }
     
-    override func handleIntersectWithObject(o : Object, side : Direction){
-        let isEnemy = o is Model
+    func releaseChildren(){
+        for c in children!  {
+            let p = c as! PickupObject
+            p.modelDidPush(self)
+            p.parent = nil
+        }
+        children!.removeAll()
+    }
+
+    func flipChildren(dir : Direction){
+        for c in children! {
+            let x_delta = dir == .Right ? (self.rect.max.x + c.rect.width/2) : (self.rect.x - c.rect.width/2)
+            c.moveTo(float3(x_delta, self.rect.mid.y + 0.4, 0))
+        }
+    }
+
+    override func flipDirection() {
+        super.flipDirection()
+        flipChildren(direction)
+    }
+    
+    override func setDirection(dir: Direction) {
+        if direction != dir {
+            flipChildren(dir)
+        }
+        super.setDirection(dir)
+    }
+    
+    func diedFromEnemy(){
+        self.velocity.y = 20
+        self.died()
+        
+    }
+    override func died(){
+        super.died()
+        velocity.x = 0
+        for c in children!  {
+            c.parent = nil
+        }
+        children!.removeAll()
+        self.collision_bitmask = 0
+    }
+    
+    override func didIntersectWithModel(m: Model, side: Direction, vector : float2) {
+        super.didIntersectWithModel(m, side: side, vector: vector)
+    }
+    
+    override func didIntersectWithObject(o : Object, side : Direction){
+        
+        super.didIntersectWithObject(o, side: side)
 
         switch(side){
         case .Top:
-            velocity.y = 0
-            contactState.setOnGround()
+            if velocity.y <= 0 {
+                velocity.y = 0
+                contactState.setOnGround()
+            }
         case .Right:
-            contactState.setOnLeftWall()
-            lastWallTime = currentTime
-            velocity.x = -1
+            if velocity.x < 0 {
+                lastWallSide = .Left
+                contactState.setOnLeftWall()
+                lastWallTime = currentTime
+                velocity.x = 0
+            }
         case .Left:
-            contactState.setOnRightWall()
-            lastWallTime = currentTime
-            velocity.x = 1
+            if velocity.x > 0 {
+                lastWallSide = .Right
+                contactState.setOnRightWall()
+                lastWallTime = currentTime
+                velocity.x = 0
+            }
         case .Bottom:
-            velocity.y = 0
-            contactState.setOnRoof()
+            if velocity.y > 0 {
+                velocity.y = 0
+                contactState.setOnRoof()
+            }
         case .None:
             break
         }
-        
-        if isEnemy{
-            let m = o as! Model
-            if side == .Top {
-                print("Killed enemy")
-                self.rect.origin.y = m.rect.get_max().y
-                self.velocity.y = 20
-                m.died()
-            } else {
-                print("Killed by enemy")
-                self.died()
-            }
-        }
-        
-        
+    
     }
 }

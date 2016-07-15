@@ -16,7 +16,8 @@ class AABB : CustomStringConvertible {
     
     var x : Float { get { return origin.x }}
     var y : Float { get { return origin.y }}
-    
+    var max : float2 { get { return get_max() }}
+    var mid : float2 { get { return float2(x + width/2, y + height/2) }}
     var description : String {
         return "x:\(origin.x) y:\(origin.y) w:\(width) h:\(height)"
     }
@@ -48,6 +49,21 @@ class AABB : CustomStringConvertible {
     }
     func get_size() -> float2{
         return float2(width, height)
+    }
+    
+    func contains(other : AABB) -> Bool {
+        return other.origin.x >= origin.x && other.origin.y >= origin.y && other.max.x <= max.x && other.max.y <= max.y
+    }
+    
+    func intersects(other : AABB) -> Bool{
+        let md = minkowskiDifference(other)
+        return md.isAtOrigo()
+    }
+    
+    func isAtOrigo() -> Bool {
+        let maximum = get_max()
+        return origin.x <= 0 && maximum.x >= 0 &&
+            origin.y <= 0 && maximum.y >= 0
     }
     
     func minkowskiDifference(other : AABB) -> AABB{
@@ -85,11 +101,7 @@ class AABB : CustomStringConvertible {
         return (boundsPoints, direction)
     }
     
-    func isAtOrigo() -> Bool {
-        let max = get_max()
-        return origin.x <= 0 && max.x >= 0 &&
-            origin.y <= 0 && max.y >= 0
-    }
+
     
     func getRayIntersectionFraction(originA : float2, directionA : float2) -> (h : Float, side : Direction) {
         let endA = originA + directionA

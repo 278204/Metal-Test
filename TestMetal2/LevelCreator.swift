@@ -11,7 +11,7 @@ import CloudKit
 
 class LevelCreator {
     
-    class func export(inout lvl : Level){
+    class func export(lvl : LevelHandler) -> NSURL{
         var height : UInt16 = 0
         var width : UInt16  = 0
         var nr_objects : UInt16 = 0
@@ -19,7 +19,7 @@ class LevelCreator {
         var pos_map = [String : Bool]()
         let objects_data = NSMutableData()
         
-        for o in lvl.objects {
+        for o in lvl.data!.lvlObjects {
             //            var o_id = o.id
             //            var o_type = o.type
             let o_x = o.x_pos
@@ -40,47 +40,49 @@ class LevelCreator {
             }
         }
         
-        let c_name = lvl.name.dataUsingEncoding(NSUTF8StringEncoding)!
-        var name_length : UInt16 = UInt16(c_name.length)
-        var id_length : UInt16 = 0
-        var id_name = NSData()
-        if lvl.recordID?.recordName != nil {
-            id_name = lvl.recordID!.recordName.dataUsingEncoding(NSUTF8StringEncoding)!
-            id_length = UInt16(id_name.length)
-            print("Export id \(lvl.recordID!.recordName)")
-        }
+//        let c_name = lvl.name.dataUsingEncoding(NSUTF8StringEncoding)!
+//        var name_length : UInt16 = UInt16(c_name.length)
+//        var id_length : UInt16 = 0
+//        var id_name = NSData()
+//        if lvl.recordID?.recordName != nil {
+//            id_name = lvl.recordID!.recordName.dataUsingEncoding(NSUTF8StringEncoding)!
+//            id_length = UInt16(id_name.length)
+//            print("Export id \(lvl.recordID!.recordName)")
+//        }
         let header_data = NSMutableData()
         header_data.appendBytes(&lvl.id, length: sizeof(UInt32))
         header_data.appendBytes(&width, length: sizeof(UInt16))
         header_data.appendBytes(&height, length: sizeof(UInt16))
         header_data.appendBytes(&nr_objects, length: sizeof(UInt16))
-        header_data.appendBytes(&name_length, length: sizeof(UInt16))
-        header_data.appendBytes(&id_length, length: sizeof(UInt16))
-        header_data.appendData(c_name)
-        header_data.appendData(id_name)
+
+//        header_data.appendBytes(&name_length, length: sizeof(UInt16))
+//        header_data.appendBytes(&id_length, length: sizeof(UInt16))
+//        header_data.appendData(c_name)
+//        header_data.appendData(id_name)
         
         let level_data = NSMutableData()
         level_data.appendBytes(header_data.bytes, length: header_data.length)
         level_data.appendBytes(objects_data.bytes, length: objects_data.length)
         
-        lvl.url = saveData(level_data, toName: "test.lvl")
+        let url = saveData(level_data, toName: "\(lvl.id).lvl")
+        return url
     }
     
-    class func importLevel(inout lvl : Level, lvlName : String){
+    class func importLevel(inout lvl : LevelHandler, lvlName : String){
         let fileURL = getURLforName(lvlName)
         importLevel(&lvl, fileURL:fileURL)
     }
-    class func importLevel(inout lvl : Level, fileURL : NSURL) {
+    class func importLevel(inout lvl : LevelHandler, fileURL : NSURL) {
         let data = loadData(fileURL: fileURL)
         importLevel(&lvl, level_data: data)
     }
-    class func importLevel(inout lvl : Level, assetURL : NSURL) {
+    class func importLevel(inout lvl : LevelHandler, assetURL : NSURL) {
         let data = loadData(assetURL: assetURL)
         importLevel(&lvl, level_data: data)
     }
     
     
-    class func importLevel(inout lvl : Level, level_data : NSData?) {
+    class func importLevel(inout lvl : LevelHandler, level_data : NSData?) {
         guard level_data != nil else {
             print("ERROR, load data is nil")
             return
@@ -90,13 +92,14 @@ class LevelCreator {
         var lvl_width : UInt16 = 0
         var lvl_height : UInt16 = 0
         var nr_objects : UInt16 = 0
-        var name_length : UInt16 = 0
-        var id_length : UInt16 = 0
-        var name_buf = NSData()
-        var id_buf = NSData()
+//        var name_length : UInt16 = 0
+//        var id_length : UInt16 = 0
+//        var name_buf = NSData()
+//        var id_buf = NSData()
         var range = NSMakeRange(0, sizeof(UInt32))
         
         level_data?.getBytes(&id, range: range)
+        
         range.location = range.length
         range.length = sizeof(UInt16)
         
@@ -109,93 +112,98 @@ class LevelCreator {
         level_data?.getBytes(&nr_objects, range: range)
         range.location += range.length
         
-        level_data?.getBytes(&name_length, range: range)
-        range.location += range.length
         
-        level_data?.getBytes(&id_length, range: range)
-        range.location += range.length
+        lvl.id = id
         
-        range.length = Int(name_length)
-        name_buf = level_data!.subdataWithRange(range)
-        range.location += range.length
+//        level_data?.getBytes(&name_length, range: range)
+//        range.location += range.length
+//
+//        level_data?.getBytes(&id_length, range: range)
+//        range.location += range.length
         
-        range.length = Int(id_length)
-        id_buf = level_data!.subdataWithRange(range)
-        range.location += range.length
+//        range.length = Int(name_length)
+//        name_buf = level_data!.subdataWithRange(range)
+//        range.location += range.length
+//        
+//        range.length = Int(id_length)
+//        id_buf = level_data!.subdataWithRange(range)
+//        range.location += range.length
         
-        let foo_name = String(data: name_buf, encoding: NSUTF8StringEncoding)
-        if foo_name != nil {
-            lvl.name = foo_name!
-        } else {
-            print("ERROR, couldn't import name")
-        }
-        
-        let foo_id = String(data: id_buf, encoding: NSUTF8StringEncoding)
-        if foo_id != nil && foo_id?.characters.count > 0 {
-            lvl.recordID = CKRecordID(recordName: foo_id!)
-        } else {
-            print("ERROR, couldn't import name")
-        }
+//        let foo_name = String(data: name_buf, encoding: NSUTF8StringEncoding)
+//        if foo_name != nil {
+//            lvl.name = foo_name!
+//        } else {
+//            print("ERROR, couldn't import name")
+//        }
+//        
+//        let foo_id = String(data: id_buf, encoding: NSUTF8StringEncoding)
+//        if foo_id != nil && foo_id?.characters.count > 0 {
+//            lvl.recordID = CKRecordID(recordName: foo_id!)
+//        } else {
+//            print("ERROR, couldn't import name")
+//        }
+//        
         
         var max_x : UInt16 = 0
         var max_y : UInt16 = 0
         for _ in 0..<nr_objects {
-            var o_id : UInt16 = 0
+            var o_id : ObjectIDs = .Cube
             var o_type : ObjectType = .Block
             var o_x : UInt16 = 0
             var o_y : UInt16 = 0
-            
+            var o_bit : UInt8 = 0
             readBuffer(level_data!, v: &o_id, range: &range)
             readBuffer(level_data!, v: &o_type, range: &range)
             readBuffer(level_data!, v: &o_x, range: &range)
             readBuffer(level_data!, v: &o_y, range: &range)
-            
+            readBuffer(level_data!, v: &o_bit, range: &range)
             max_x = max(o_x, max_x)
             max_y = max(o_y, max_y)
             
             let o = LevelObject(o_id, o_type, o_x, o_y)
-            lvl.objects.append(o)
+            o.collision_side_bit = o_bit
+            o.can_rest = o_bit == 0b1111
+            lvl.data!.lvlObjects.append(o)
+            
+            print("lo \(o.x_pos) \(o.y_pos) \(o.collision_side_bit)")
+
         }
         
-        for i in 0...max_x {
-            let temp = [Bool](count: Int(max_y+1), repeatedValue: false)
-            lvl.filled_grid.insert(temp, atIndex: Int(i))
-        }
-        
-        for lo in lvl.objects {
-            lvl.filled_grid[Int(lo.x_pos)][Int(lo.y_pos)] = true
-        }
-        
-        for lo in lvl.objects {
-            
-            let left = GridPoint(x: Int(lo.x_pos)-1, y: Int(lo.y_pos))
-            let right = GridPoint(x: Int(lo.x_pos)+1, y: Int(lo.y_pos))
-            let bottom = GridPoint(x: Int(lo.x_pos), y: Int(lo.y_pos)-1)
-            let top = GridPoint(x: Int(lo.x_pos), y: Int(lo.y_pos)+1)
-            
-            
-            var bit : UInt8 = 0
-            if in_range_filled_grid(top, filled_grid: lvl.filled_grid) && lvl.filled_grid[top.x][top.y]{
-                bit = bit | 0b1000
-            }
-            if in_range_filled_grid(bottom, filled_grid: lvl.filled_grid) && lvl.filled_grid[bottom.x][bottom.y]{
-                bit = bit | 0b0010
-            }
-            if in_range_filled_grid(left, filled_grid: lvl.filled_grid) && lvl.filled_grid[left.x][left.y]{
-                bit = bit | 0b0001
-            }
-            if in_range_filled_grid(right, filled_grid: lvl.filled_grid) && lvl.filled_grid[right.x][right.y]{
-                bit = bit | 0b0100
-            }
-            
-            
-            if lo.x_pos >= 10 {
-                print("lo \(lo.x_pos) \(lo.y_pos) \(bit)")
-                
-            }
-            lo.can_rest = bit == 0b1111
-            lo.collision_bit = bit
-        }
+//        for i in 0...max_x {
+//            let temp = [Bool](count: Int(max_y+1), repeatedValue: false)
+//            lvl.filled_grid.insert(temp, atIndex: Int(i))
+//        }
+//        
+//        for lo in lvl.lvlObjects {
+//            lvl.filled_grid[Int(lo.x_pos)][Int(lo.y_pos)] = true
+//        }
+//        
+//        for lo in lvl.lvlObjects {
+//            
+//            let left = GridPoint(x: Int(lo.x_pos)-1, y: Int(lo.y_pos))
+//            let right = GridPoint(x: Int(lo.x_pos)+1, y: Int(lo.y_pos))
+//            let bottom = GridPoint(x: Int(lo.x_pos), y: Int(lo.y_pos)-1)
+//            let top = GridPoint(x: Int(lo.x_pos), y: Int(lo.y_pos)+1)
+//            
+//            
+//            var bit : UInt8 = 0
+//            if Level.insideGrid(top, grid: lvl.filled_grid) && lvl.filled_grid[top.x][top.y]{
+//                bit = bit | 0b1000
+//            }
+//            if Level.insideGrid(bottom, grid: lvl.filled_grid) && lvl.filled_grid[bottom.x][bottom.y]{
+//                bit = bit | 0b0010
+//            }
+//            if Level.insideGrid(left, grid: lvl.filled_grid) && lvl.filled_grid[left.x][left.y]{
+//                bit = bit | 0b0001
+//            }
+//            if Level.insideGrid(right, grid: lvl.filled_grid) && lvl.filled_grid[right.x][right.y]{
+//                bit = bit | 0b0100
+//            }
+//            
+//            
+//            lo.can_rest = bit == 0b1111
+//            lo.collision_side_bit = bit
+//        }
         
     }
     
@@ -234,7 +242,5 @@ class LevelCreator {
         let responseData = docs_url?.URLByAppendingPathComponent(name)
         return responseData!
     }
-    class func in_range_filled_grid(p : GridPoint, filled_grid : [[Bool]]) -> Bool{
-        return p.x >= 0 && Int(p.x) < filled_grid.count && p.y >= 0 && Int(p.y) < filled_grid[Int(p.x)].count
-    }
+
 }

@@ -42,13 +42,13 @@ class Renderer {
     var commandEncoder : MTLRenderCommandEncoder?
     var commandBuffer : MTLCommandBuffer?
     var drawable : CAMetalDrawable?
+    var lastDrawable : CAMetalDrawable?
     var sampler : MTLSamplerState?
     
     //OPTIMIZE, unnecessary?
     var depthTexture : MTLTexture?
     
-    
-    
+
     func initilize(){
         
         print("Init renderer")
@@ -59,7 +59,8 @@ class Renderer {
         
         metalLayer?.device = device
         metalLayer?.pixelFormat = MTLPixelFormat.BGRA8Unorm
-        metalLayer?.framebufferOnly = true
+        //WARNING, optimize?
+        metalLayer?.framebufferOnly = false
         
         library = device?.newDefaultLibrary()
         pipelineIsDirty = true
@@ -71,7 +72,6 @@ class Renderer {
         samplerDescriptor.minFilter = MTLSamplerMinMagFilter.Nearest
         samplerDescriptor.magFilter = MTLSamplerMinMagFilter.Linear
         self.sampler = self.device?.newSamplerStateWithDescriptor(samplerDescriptor)
-        
     }
     
     func buildPipeline(){
@@ -132,6 +132,7 @@ class Renderer {
     }
     
     func createDepthBuffer(){
+        print("metallayer \(self.metalLayer?.bounds.size)")
         let drawableSize = self.metalLayer!.drawableSize
         let depthTexDesc =  MTLTextureDescriptor.texture2DDescriptorWithPixelFormat(MTLPixelFormat.Depth32Float, width: Int(drawableSize.width), height: Int(drawableSize.height), mipmapped: false)
         
@@ -147,7 +148,7 @@ class Renderer {
             self.createDepthBuffer()
         }
         
-        self.drawable = self.metalLayer!.nextDrawable()
+        self.drawable = self.metalLayer?.nextDrawable()
         let frameBufferTexture = self.drawable?.texture
         
         if frameBufferTexture == nil {
@@ -184,25 +185,28 @@ class Renderer {
         return !failure
     }
     
-    func drawMesh(mesh : Mesh, uniformBuffer : MTLBuffer, texture : MTLTexture?){
+    func drawMesh(mesh : Mesh, skeletonBuffer : MTLBuffer, uniformBuffer : MTLBuffer, texture : MTLTexture?){
 
         self.commandEncoder?.setVertexBuffer(mesh.vertexBuffer!, offset: 0, atIndex: 0)
         self.commandEncoder?.setVertexBuffer(uniformBuffer, offset: 0, atIndex: 1)
         
-        self.commandEncoder?.setVertexBuffer(mesh.skeletonBuffer!, offset: 0, atIndex: 2)
+        self.commandEncoder?.setVertexBuffer(skeletonBuffer, offset: 0, atIndex: 2)
        
         
         self.commandEncoder?.setFragmentBuffer(uniformBuffer, offset: 0, atIndex: 0)
+        self.commandEncoder?.setFragmentBuffer(mesh.fragmentTypeBuffer!, offset: 0, atIndex: 1)
         self.commandEncoder?.setFragmentTexture(texture, atIndex: 0)
         self.commandEncoder?.setFragmentSamplerState(self.sampler, atIndex: 0)
         
-        self.commandEncoder?.drawPrimitives(.Triangle, vertexStart: 0, vertexCount: mesh.nr_vertices)
+        self.commandEncoder?.drawPrimitives(mesh.primativeType, vertexStart: 0, vertexCount: mesh.nr_vertices)
     }
     
-    func drawLineMesh(vertexBuffer : MTLBuffer, uniformBuffer : MTLBuffer, nrOfVertices : Int){
+    func drawLineMesh(vertexBuffer : MTLBuffer, uniformBuffer : MTLBuffer, nrOfVertices : Int, texture : MTLTexture?){
         self.commandEncoder?.setVertexBuffer(vertexBuffer, offset: 0, atIndex: 0)
         self.commandEncoder?.setVertexBuffer(uniformBuffer, offset: 0, atIndex: 1)
         self.commandEncoder?.setFragmentBuffer(uniformBuffer, offset: 0, atIndex: 0)
+        self.commandEncoder?.setFragmentTexture(texture, atIndex: 0)
+        self.commandEncoder?.setFragmentSamplerState(self.sampler, atIndex: 0)
         self.commandEncoder?.drawPrimitives(.Line, vertexStart: 0, vertexCount: nrOfVertices)
     }
     
@@ -212,6 +216,7 @@ class Renderer {
 
         if self.drawable != nil {
             self.commandBuffer?.presentDrawable(self.drawable!)
+            lastDrawable = self.drawable
             self.drawable = nil
         }
         

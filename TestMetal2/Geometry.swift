@@ -128,81 +128,28 @@ struct Vertex {
     }
 }
 
-class HitTest{
+enum Direction {
+    case None
+    case Right
+    case Left
+    case Top
+    case Bottom
     
-    static func intersectTop(tl : CGPoint, tr : CGPoint, rect : CGRect) -> CGFloat{
-        let ry2 = rect.origin.y + rect.height
-        let rx = rect.origin.x
-        let rx2 = rect.origin.x + rect.width
-        if tl.y < ry2 && tl.y > rect.origin.y{
-            if rx > tr.x || rx2 < tl.x {
-                return 0.0
-            } else {
-                return rect.origin.y - tl.y
-            }
+    mutating func opposite(){
+        switch(self){
+        case .Right:
+            self = .Left
+        case .Left:
+            self = .Right
+        case .Top:
+            self = .Bottom
+        case .Bottom:
+            self = .Top
+        default:
+            break
         }
-        return 0.0
-    }
-    
-    
-    static func intersectBottom(bl : CGPoint, br : CGPoint, rect : CGRect) -> CGFloat{
-        let ry2 = rect.origin.y + rect.height
-        let rx = rect.origin.x
-        let rx2 = rect.origin.x + rect.width
-        if bl.y < ry2 && bl.y > rect.origin.y{
-            if rx > br.x || rx2 < bl.x {
-                return 0.0
-            } else {
-                return ry2 - bl.y
-            }
-        }
-        return 0.0
-    }
-    
-    static func intersectRight(r1 : CGPoint, r2 : CGPoint, rect : CGRect) -> CGFloat{
-        let ry = rect.origin.y
-        let ry2 = rect.origin.y + rect.height
-        
-        if r1.x > rect.origin.x && r1.x < rect.origin.x + rect.width {
-            if ry > r2.y || ry2 < r1.y {
-                return 0.0
-            } else{
-                return r1.x - rect.origin.x
-            }
-        }
-        return 0.0
-    }
-    
-    static func intersectLeft(l1 : CGPoint, l2 : CGPoint, rect : CGRect) -> CGFloat{
-        let ry = rect.origin.y
-        let ry2 = rect.origin.y + rect.height
-        
-        if l1.x > rect.origin.x && l1.x < rect.origin.x + rect.width {
-            if ry > l2.y || ry2 < l1.y {
-                return 0.0
-            } else{
-                return rect.origin.x + rect.width - l1.x
-            }
-        }
-        return 0.0
-    }
-    
-    static func crossesTop(cur_rect : CGRect, nxt_rect : CGRect, rect : CGRect) -> Bool{
-        let rect_bottom =  rect.origin.y
-        return cur_rect.origin.y + cur_rect.height <= rect_bottom && nxt_rect.origin.y + nxt_rect.height > rect_bottom
-    }
-    static func crossesBottom(cur_rect : CGRect, nxt_rect : CGRect, rect : CGRect) -> Bool{
-        let rect_top =  rect.origin.y + rect.height
-        return cur_rect.origin.y >= rect_top && nxt_rect.origin.y < rect_top
-    }
-    static func crossesRight(cur_rect : CGRect, nxt_rect : CGRect, rect : CGRect) -> Bool{
-        let rect_left = rect.origin.x
-        return cur_rect.origin.x + cur_rect.width <= rect_left && nxt_rect.origin.x + nxt_rect.width > rect_left
-    }
-    static func crossesLeft(cur_rect : CGRect, nxt_rect : CGRect, rect : CGRect) -> Bool{
-        let rect_right = rect.origin.x + rect.width
-        return cur_rect.origin.x >= rect_right && nxt_rect.origin.x < rect_right
     }
 }
+
 
 

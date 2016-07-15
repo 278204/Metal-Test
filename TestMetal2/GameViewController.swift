@@ -10,13 +10,15 @@ import UIKit
 import Metal
 import MetalKit
 import simd
-
-class GameViewController : UIViewController, GamePadDelegate{
+    
+class GameViewController : UIViewController, GamePadDelegate, GameWorldDelegate{
     var metalView : MetalView {get {return self.view as! MetalView}}
     let gameWorld : GameWorld
-    var level : Level?
+    var level : LevelHandler?
     var displayLink : CADisplayLink?
-    
+    var pauseMenu : PauseTableView?
+    var completed = false
+    var lastScreenshot : UIImage?
     
     required init?(coder aDecoder: NSCoder) {
         gameWorld = GameWorld()
@@ -33,12 +35,6 @@ class GameViewController : UIViewController, GamePadDelegate{
         gameWorld.graphics.start(self.view.layer as! CAMetalLayer)
         GamePad.shared.delegate = self
         
-        if level == nil {
-            level = Level()
-            level!.importLevel("test.lvl")
-        }
-        gameWorld.playLevel(level!)
-        
         #if TARGET_OS_IOS
         let rotater = UIPanGestureRecognizer(target: self, action: Selector("pannedTwoFingers:"))
         rotater.minimumNumberOfTouches = 1
@@ -53,57 +49,107 @@ class GameViewController : UIViewController, GamePadDelegate{
     
     override func viewDidAppear(animated: Bool){
         self.displayLink = UIScreen.mainScreen().displayLinkWithTarget(self, selector: "displayDidLinkFire:")
-//        self.displayLink = CADisplayLink(target: self, selector: "displayDidLinkFire:")
         self.displayLink?.addToRunLoop(NSRunLoop.mainRunLoop(), forMode: NSDefaultRunLoopMode)
     }
     
     override func viewWillDisappear(animated: Bool) {
+        self.displayLink?.removeFromRunLoop(NSRunLoop.mainRunLoop(), forMode: NSDefaultRunLoopMode)
         self.displayLink?.invalidate()
         self.displayLink = nil
     }
     
     func displayDidLinkFire(dLink : CADisplayLink){
-        self.gameWorld.gameLoop()
+        if GamePad.shared.controllerConnected {
+            GamePad.shared.checkButtons()
+        }
+//        if !completed {
+            self.gameWorld.gameLoop()
+//        }
+        
     }
-    
-    func pannedTwoFingers(panner : UIPanGestureRecognizer){
-        let translation = panner.translationInView(self.view)
-        gameWorld.player.rotateY(Float(translation.x))
-        panner.setTranslation(CGPointZero, inView: self.view)
-    }
+
     
     func gamePadDidPressButton(button: Button) {
-//        print("Did press \(button)")
-        switch(button){
-        case .A:
-            gameWorld.player.jumpStart()
-        case .Left:
-            gameWorld.player.runLeft()
-        case .Right:
-            gameWorld.player.runRight()
-        case .LeftTrigger:
-            gameWorld.timeModifier = 0.3
-        default:
-            break
+        if gameWorld.paused == false {
+            switch(button){
+            case .A:
+                gameWorld.player.jumpStart()
+            case .Left:
+                gameWorld.player.runLeft()
+            case .Right:
+                gameWorld.player.runRight()
+            case .LeftTrigger:
+                gameWorld.timeModifier = 0.3
+            case .RightTrigger:
+                gameWorld.player.canPickUp = true
+            default:
+                break
+            }
         }
     }
     
     func gamePadDidReleaseButton(button: Button) {
-        switch(button){
-        case .A:
-            gameWorld.player.jumpEnd()
-        case .Left:
-            gameWorld.player.stop()
-        case .Right:
-            gameWorld.player.stop()
-        case .LeftTrigger:
-            gameWorld.timeModifier = 1.0
-        default:
-            break
+        if gameWorld.paused == false {
+            switch(button){
+            case .A:
+                gameWorld.player.jumpEnd()
+            case .Left:
+                gameWorld.player.stop()
+            case .Right:
+                gameWorld.player.stop()
+            case .LeftTrigger:
+                gameWorld.timeModifier = 1.0
+            case .RightTrigger:
+                gameWorld.player.canPickUp = false
+                gameWorld.player.releaseChildren()
+            default:
+                break
+            }
+        } else {
+            switch(button){
+            case .A:
+                pauseMenu?.selectCurrent()
+            case .Up:
+                pauseMenu?.selectPrevious()
+            case .Down:
+                pauseMenu?.selectNext()
+            default:
+                break
+            }
         }
     }
+    
+    func gamePadDidPressPause() {
+        
+    }
+    
+    
+    func gameWorldWasPaused(gameWorld: GameWorld) {
+    }
+    
+    func gameWorldWasResumed(gameWorld: GameWorld) {
+    }
+    
+    func gameWorldWasCompleted(gameWorld: GameWorld) {
+        if gameWorld.graphics.renderer.metalLayer?.framebufferOnly == false{
+            if let image = gameWorld.graphics.renderer.lastDrawable!.texture.toImage() {
+                self.lastScreenshot = UIImage(CGImage: image)
+            } else {
+                print("WARNING, couldn't capture image")
+            }
+        } else {
+            print("WARNING, frameBuffer true")
+        }
+        
+
+        self.completed = true
+        self.gameWorld.paused = true
+        self.gameWorld.reset()
+    }
+    
+    func gameWorldWillRestore(gameWorld: GameWorld) {
+        
+    }
+    
 
 }
-
-
-

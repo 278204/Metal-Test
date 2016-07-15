@@ -16,15 +16,16 @@ class BoxEnemyConst {
     static let topSpeed     : Float  = 10
 }
 
-class BoxEnemy : Model {
+class BoxEnemy : Enemy {
     
     init() {
-        super.init(name: "Cube", texture: "Texture2.png")
+        super.init(name: "Cube", texture: "Texture2.png", fragmentType: FragmentType.Texture)
+        self.topSpeed = float2(10,10)
         changeAcceleration(-BoxEnemyConst.acc)
     }
     
     override func update(dt: Float, currentTime ct : Float) {
-        super.update(dt, currentTime: ct)
+        
         handleAnimations(dt)
         
         let gravity_delta = dt * Float(Settings.gravity * mass)
@@ -43,32 +44,9 @@ class BoxEnemy : Model {
             } else {
                 velocity.x += -Float(Math.sign(velocity.x)) * BoxEnemyConst.deceleration * dt
             }
-            
-            //TopSpeed
-            if abs(velocity.x) > BoxEnemyConst.topSpeed {
-                velocity.x = Float(Math.sign(velocity.x)) * min(abs(velocity.x), BoxEnemyConst.topSpeed)
-            }
         }
         
-        try_moveBy(float3(velocity.x * dt, velocity.y * dt, 0))
+        super.update(dt, currentTime: ct)
     }
     
-    override func handleIntersectWithObject(o : Object, side : Direction){
-        switch(side){
-        case .Top:
-            velocity.y = 0
-            contactState.setOnGround()
-        case .Right:
-            velocity.x = 0
-            changeAcceleration(BoxEnemyConst.acc)
-        case .Left:
-            velocity.x = 0
-            changeAcceleration(-BoxEnemyConst.acc)
-        case .Bottom:
-            velocity.y = 0
-        case .None:
-            break
-        }
-        
-    }
 }

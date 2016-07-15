@@ -29,9 +29,10 @@ class MetalView : UIView {
     }
     required init?(coder aDecoder: NSCoder) {
         super.init(coder: aDecoder)
-        print("Init metal view")
+        print("Init metal view coder")
         metalLayer = self.layer as? CAMetalLayer
-        
+        let scale = UIScreen.mainScreen().scale
+        metalLayer?.drawableSize = CGSize(width: self.bounds.width * scale, height: self.bounds.height * scale)
     }
     
     

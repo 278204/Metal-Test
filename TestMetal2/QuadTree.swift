@@ -10,14 +10,16 @@ import Foundation
 import simd
 
 class QuadTree{
-    private let MAX_OBJECTS = 10
-    private let MAX_LEVELS = 1000
+    private let MAX_OBJECTS = 4
+    private let MAX_LEVELS = 5
     
     private let level : Int
-    private var objects = [Object]()
-    private var models = [Object]()
-    private let bounds : AABB
+    private var statics = [Object]()
+//    private var dynamics = [Object]()
     private var nodes : [QuadTree?]
+    
+    let bounds : AABB
+    var uniformBuffer : MTLBuffer?
     
     init(level l : Int, bounds b : float4){
         level = l
@@ -26,8 +28,8 @@ class QuadTree{
     }
     
     func clear(){
-        objects.removeAll()
-        models.removeAll()
+        statics.removeAll()
+//        dynamics.removeAll()
         for i in 0..<nodes.count {
             nodes[i]?.clear()
             nodes[i] = nil
@@ -35,7 +37,7 @@ class QuadTree{
     }
     
     func clearModels(){
-        models.removeAll()
+//        dynamics.removeAll()
         for i in 0..<nodes.count {
             nodes[i]?.clearModels()
         }
@@ -57,103 +59,120 @@ class QuadTree{
         nodes[3] = QuadTree(level: level+1, bounds: float4(x + subWidth, y, subWidth, subHeight))
     }
     
-    private func getIndex(rect : AABB) -> Int{
-        var index = -1
+    private func getIndex(rect : AABB) -> [Int]{
+        
+        
         let verticalMidPoint = bounds.origin.x + (bounds.width / 2)
         let horizontalMidPoint = bounds.origin.y + (bounds.height / 2)
         
-        let topQuad = (rect.origin.y >= horizontalMidPoint)
-        let bottomQuad = (rect.get_max().y < horizontalMidPoint)
+        var topQuad = rect.y >= horizontalMidPoint
+        var bottomQuad = (rect.max.y < horizontalMidPoint)
         
-        if rect.origin.x < verticalMidPoint && rect.get_max().x < verticalMidPoint  {
-            //In left quad
+        let topAndBottom = rect.max.y >= horizontalMidPoint && rect.y <= horizontalMidPoint
+        
+        if topAndBottom {
+            topQuad = false
+            bottomQuad = false
+        }
+        
+        if rect.x <= verticalMidPoint && rect.max.x >= verticalMidPoint {
+            //Left and Right
             if topQuad {
-                index = 1
+                return [0,1]
             } else if bottomQuad {
-                index = 2
+                return [2,3]
+            } else if topAndBottom {
+                return [0,1,2,3]
             }
-        } else if rect.origin.x > verticalMidPoint {
-            //In right quad
+            
+        } else if rect.x >= verticalMidPoint {
+            //Right
             if topQuad {
-                index = 0
+                 return [0]
             } else if bottomQuad {
-                index = 3
+                 return [3]
+            } else if topAndBottom {
+                 return [0,3]
+            }
+        } else if rect.max.x < verticalMidPoint {
+            //Left
+            if topQuad {
+                 return [1]
+            } else if bottomQuad {
+                 return [2]
+            } else if topAndBottom {
+                 return [1,2]
             }
         }
-//        print("parent \(bounds)")
-//        print("child node \(rect) \(index)")
-        
-        return index
+        return [-1]
     }
     
-    func insert(obj : Object) {
-        if nodes[0] != nil {
-            let index = getIndex(obj.rect)
-            if index > -1 {
-                nodes[index]!.insert(obj)
-                return
-            }
-        }
-        
-        if obj is Model {
-            models.append(obj)
-        } else {
-            objects.append(obj)
-        }
-        
-        if objects.count + models.count >= MAX_OBJECTS && level < MAX_LEVELS {
+    
+    func insert(obj : Object){
+//        if bounds.intersects(obj.rect) {
             if nodes[0] == nil {
-                split()
-            }
-            var i = 0
-            while i < objects.count {
-                let o = objects[i]
-                let index = getIndex(o.rect)
-                if index != -1 {
-                    nodes[index]!.insert(objects.removeAtIndex(i))
-                } else {
-                    i += 1
+                
+                statics.append(obj)
+                
+                if statics.count > MAX_OBJECTS && level < MAX_LEVELS {
+                    split()
+                    for i in 0..<statics.count {
+                        let o = statics[i]
+                        let index_list  = getIndex(o.rect)
+                        for index in index_list {
+                            if index != -1 {
+                                nodes[index]!.insert(o)
+                            }
+                        }
+                    }
+                    statics.removeAll()
+                }
+            } else {
+                let index_list = getIndex(obj.rect)
+                for index in index_list {
+                    if index != -1 {
+                        nodes[index]!.insert(obj)
+                    }
                 }
             }
-            i = 0
-            while i < models.count {
-                let o = models[i]
-                let index = getIndex(o.rect)
-                if index != -1 {
-                    nodes[index]!.insert(models.removeAtIndex(i))
-                } else {
-                    i += 1
-                }
-            }
-        } else if level >= MAX_LEVELS {
-            print("WARNING, hit limit of quadtree levels \(level)")
+//        }
+    }
+
+    
+    func getNodes()->[QuadTree]{
+        
+        if nodes[0] == nil {
+            return [self]
         }
+        
+        var list = [QuadTree]()
+        for n in nodes {
+            let l = n!.getNodes()
+            list.appendContentsOf(l)
+        }
+        list.append(self)
+        return list
     }
     
-    func retrieveList(o : Object) -> [Object] {
-        let rect = o.rect
+    func retrieveList(o : AABB) -> [Object] {
+
 //        if o is Model {
 //            let m = o as! Model
 //            let origin = float2(min(m.current_rect.x, m.rect.x), min(m.current_rect.y, m.rect.y))
 //            rect = AABB(origin: origin, size: m.current_rect.get_size() + m.rect.get_size())
 //        }
-        let index = getIndex(rect)
         var list = [Object]()
         if nodes[0] != nil {
-            if index != -1 {
-                let l = nodes[index]!.retrieveList(o)
-                list.appendContentsOf(l)
-            } else {
-                for i in 0..<4 {
-                    let l = nodes[i]!.retrieveList(o)
+            let index_list = getIndex(o)
+            for index in index_list {
+                if index != -1 {
+                    let l = nodes[index]!.retrieveList(o)
                     list.appendContentsOf(l)
                 }
             }
+        } else {
+            return statics
         }
-        
-        
-        list.appendContentsOf(objects)
-        list.appendContentsOf(models)
         return list
     }
     

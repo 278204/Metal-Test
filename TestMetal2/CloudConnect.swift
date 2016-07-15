@@ -13,44 +13,57 @@ class CloudConnect {
 
     class var db : CKDatabase {get { return CKContainer.defaultContainer().publicCloudDatabase}}
     
-    class func uploadLevel(inout level : Level){
-        guard level.url != nil else {
-            print("ERROR, level url is nil")
-            return
-        }
+    class func uploadLevel(inout level : LevelHandler, completion : (CKRecord? -> Void)){
+//        guard level.url != nil else {
+//            print("ERROR, level url is nil")
+//            completion(nil)
+//            return
+//        }
         
         if level.recordID == nil {
-            uploadNewLevel(&level)
+            uploadNewLevel(&level, completion: completion)
         } else {
-            uploadChangedLevel(level)
+            uploadChangedLevel(level, completion: completion)
         }
     }
     
-    class func uploadNewLevel(inout level : Level){
+    class func uploadCompletedLevel(level : LevelHandler, completion : (NSError? -> Void)){
+        let record = level.getCompleteRecord()!
+        db.saveRecord(record) { (record, error) -> Void in
+            completion(error)
+        }
+    }
+    
+    class func uploadNewLevel(inout level : LevelHandler, completion : (CKRecord? -> Void)){
         
         let record = level.getRecord()
         if record == nil {
             print("Get record failed")
+            completion(nil)
             return
         }
         db.saveRecord(record!) { (saved, error) -> Void in
             if error != nil {
                 print("Save record went wrong \(error.debugDescription)")
+                completion(nil)
             } else {
                 print("Did save record")
                 level.recordID = saved!.recordID
+                completion(saved)
             }
         }
     }
     
-    class func uploadChangedLevel(level : Level){
+    class func uploadChangedLevel(level : LevelHandler, completion : (CKRecord? -> Void)){
         guard level.recordID != nil else {
             print("Cant change level without record id")
+            completion(nil)
             return
         }
         let record = level.getRecord()
         if record == nil {
             print("Get record failed")
+            completion(nil)
             return
         }
         changedRecords([record!], completion: {error in
@@ -59,6 +72,7 @@ class CloudConnect {
             } else {
                 print("ERROR changing level \(error.debugDescription)")
             }
+            completion(record)
         })
     }
     
@@ -71,7 +85,6 @@ class CloudConnect {
     
         saveRecordsOperation.recordsToSave = records
         saveRecordsOperation.savePolicy = .ChangedKeys
-        
         saveRecordsOperation.modifyRecordsCompletionBlock = { savedRecords, deletedRecordIDs, error in
             completion(error)
         }

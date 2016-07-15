@@ -139,5 +139,13 @@ class Skeleton{
         return skeleton_matrices
     }
     
+    func getIdentitySkeletonData() -> NSData {
+        let skeleton_matrices = NSMutableData()
+        for s in joints where s != nil{
+            var mat = Matrix.Identity()
+            skeleton_matrices.appendBytes(&mat, length: sizeof(float4x4))
+        }
+        return skeleton_matrices
+    }
     
 }

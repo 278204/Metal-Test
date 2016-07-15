@@ -9,7 +9,14 @@
 import Foundation
 import simd
 
+struct Uniforms{
+    let modelViewProjectionMatrix : float4x4
+    let modelViewMatrix : float4x4
+    let normalMatrix : float3x3
+}
+
 class Camera {
+    var frustumSize = float2(0,0)
     var view_matrix : float4x4
     var projection_matrix = Matrix.Identity()
     var position : float3   {didSet{positionDidSet()}}
@@ -82,6 +89,8 @@ class Camera {
         mat[3][1] = -(t + b)/(t - b)
         mat[3][2] = 0.4//(f + n)/(f - n)
         
+        frustumSize = float2(r - l, t - b)
+        print("Camera frustum size \(frustumSize)")
 //        let mat = float4x4(diagonal: float4(1,1,0,1))
         
         

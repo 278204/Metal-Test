@@ -10,36 +10,35 @@ import Foundation
 
 
 class TextureHandler {
+    static var textureID : Int = 0
     static let shared = TextureHandler()
     private var device : MTLDevice? {get { return DeviceSingleton.shared}}
-    private var texture_map = [String : MTLTexture]()
-    
-    
-    subscript (name : String?) -> MTLTexture? {
-        if name == nil {
+    private var texture_map = [MTLTexture]()
+    private var name_map = [String : Int]()
+
+    func getTexture(textureID : Int?) -> MTLTexture? {
+        guard textureID != nil && textureID! < texture_map.count else {
             return nil
-        } else {
-            return getTexture(name!)
         }
+        return texture_map[textureID!]
+    }
+    func getTexture(textureName : String) -> MTLTexture? {
+        return texture_map[name_map[textureName]!]
     }
     
-    func getTexture(textureName : String) -> MTLTexture {
-        if texture_map[textureName] == nil {
-            print("Create new texture \(textureName)")
-            texture_map[textureName] = newTexture(textureName)
+    func newTexture(textureName : String) -> Int{
+        var index = name_map[textureName]
+        if index == nil {
+            let image = UIImage(named: textureName )
+            if image == nil {
+                print("ERROR creating new material, image couldn't be found \(textureName)")
+                assertionFailure()
+            }
+            index = texture_map.count
+            texture_map.append(textureForImage(image!))
+            name_map[textureName] = index
         }
-        return texture_map[textureName]!
-    }
-    
-    private func newTexture(textureName : String) -> MTLTexture{
-        
-        let image = UIImage(named: textureName)
-        if image == nil {
-            print("ERROR creating new material, image couldn't be found \(image)")
-            assertionFailure()
-        }
-        
-        return textureForImage(image!)
+        return index!
     }
     
     private func textureForImage(image : UIImage) -> MTLTexture{
